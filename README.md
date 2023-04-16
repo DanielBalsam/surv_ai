@@ -1,2 +1,2 @@
-# Your are the SuperIntelligence
+# Become a SuperIntelligence
 Become your own super intelligence.
