@@ -39,7 +39,11 @@ class VectorSearch:
 
     @classmethod
     def sort_by_similarity(
-        cls, embeddings, query, type=VectorSearchType.FAISS
+        cls,
+        embeddings,
+        query,
+        type=VectorSearchType.FAISS,
+        similarity_threshold=0.0,
     ):
         has_embeddings = (
             len(embeddings) > 0
@@ -62,5 +66,9 @@ class VectorSearch:
             indices = np.argsort(similarities)[::-1]
         elif type == VectorSearchType.FAISS:
             similarities, indices = cls.faiss_search(embeddings, query)
+
+        if similarity_threshold:
+            normalized_similarities = similarities / np.max(similarities)
+            indices = indices[normalized_similarities > similarity_threshold]
 
         return similarities, indices

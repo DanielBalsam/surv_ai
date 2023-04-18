@@ -38,14 +38,8 @@ class LocalMemoryStore(MemoryStoreInterface):
             [embedding],
             type=VectorSearchType.L2,
         )
-        return [
-            Memory(
-                text=self.memories[i].text,
-                source=self.memories[i].source,
-                embedding=[],
-            )
-            for i in indices[:number]
-        ]
+
+        return [self.memories[i] for i in indices[:number]]
 
     @staticmethod
     def memories_as_list(memories: list[Memory]) -> str:

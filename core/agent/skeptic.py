@@ -7,18 +7,24 @@ from .interfaces import AgentInterface
 from .base import BaseAgent
 
 
-class ResearchAgent(BaseAgent, AgentInterface):
+class SkepticAgent(BaseAgent, AgentInterface):
     def _get_initial_prompt_text(self, memory_list: str):
         return f"""        
-        Your job is to see relevant information to find an answer to subsequent prompt.
+        Your job is to ask difficult questions that intellectually challenge a prompt provided to you.
 
-        Domain of question: {self.context}
+        Domain of questions: {self.context}
 
         {memory_list}
 
-        The next message will be a question from the user.
+        The next message will be an assertion from the user.
 
-        Please explain your thinking, but never respond with more than a few sentences.  
+        You may not agree with the assertion, as you must ask questions that challenge the assertion.
+
+        You should ask for specific examples as often as possible.
+
+        Please only respond with a single question.
+
+        If you do not have any further questions, you can respond with "I have no questions."
         """
 
     async def _build_completion_prompt(
@@ -46,11 +52,11 @@ class ResearchAgent(BaseAgent, AgentInterface):
             messages=[
                 PromptMessage(
                     role="system",
-                    content=f"""A user will ask you a question.
+                    content=f"""A user will present you with an assertion.
 
-                    Your job will be to categorize this question with a few words.
+                    Your job will be to categorize this assertion with a few words.
 
-                    For instance, if the question is "What is the capital of France?", then you might respond with "geography".
+                    For instance, if the assertion is "Paris is the capital of France", then you might respond with "geography".
                     """,
                 ),
                 PromptMessage(

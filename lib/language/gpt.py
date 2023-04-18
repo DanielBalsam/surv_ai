@@ -16,23 +16,27 @@ class GPTClient(LargeLanguageModelClientInterface):
     def __init__(
         self,
         api_key: str,
-        temperature: float = 0.1,
         max_tokens: int = 1500,
         model=GPTModel.TURBO,
     ):
         self.api_key = api_key
-        self.temperature = temperature
         self.max_tokens = max_tokens
         self.model = model
 
     async def _get_completion(
-        self, session: ClientSession, prompt: Prompt, attempt=1
+        self,
+        session: ClientSession,
+        prompt: Prompt,
+        attempt=1,
+        presence_penalty=0,
+        temperature=1,
     ) -> str:
         try:
             request = {
                 "model": self.model,
                 "messages": [message.dict() for message in prompt.messages],
-                "temperature": self.temperature,
+                "temperature": temperature,
+                "presence_penalty": presence_penalty,
                 "max_tokens": self.max_tokens,
             }
 
@@ -58,8 +62,18 @@ class GPTClient(LargeLanguageModelClientInterface):
 
         return response_body["choices"][0]["message"]["content"]
 
-    async def get_completions(self, prompts: list[Prompt]) -> list[str]:
+    async def get_completions(
+        self, prompts: list[Prompt], presence_penalty=0, temperature=1
+    ) -> list[str]:
         async with ClientSession() as session:
             return await asyncio.gather(
-                *[self._get_completion(session, prompt) for prompt in prompts],
+                *[
+                    self._get_completion(
+                        session,
+                        prompt,
+                        presence_penalty=presence_penalty,
+                        temperature=temperature,
+                    )
+                    for prompt in prompts
+                ],
             )

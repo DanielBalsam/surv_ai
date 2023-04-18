@@ -7,18 +7,20 @@ from .interfaces import AgentInterface
 from .base import BaseAgent
 
 
-class ResearchAgent(BaseAgent, AgentInterface):
+class DecisionAgent(BaseAgent, AgentInterface):
     def _get_initial_prompt_text(self, memory_list: str):
         return f"""        
-        Your job is to see relevant information to find an answer to subsequent prompt.
+        Your job is to cast a reasonable vote based on the information provided to you.
 
-        Domain of question: {self.context}
+        Domain of questions: {self.context}
 
         {memory_list}
 
         The next message will be a question from the user.
 
-        Please explain your thinking, but never respond with more than a few sentences.  
+        You must make a decision based on the information provided to you.
+
+        You may only respond with a single word, or proper noun.
         """
 
     async def _build_completion_prompt(
@@ -46,7 +48,7 @@ class ResearchAgent(BaseAgent, AgentInterface):
             messages=[
                 PromptMessage(
                     role="system",
-                    content=f"""A user will ask you a question.
+                    content=f"""A user will present you with a question.
 
                     Your job will be to categorize this question with a few words.
 
