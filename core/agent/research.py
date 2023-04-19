@@ -25,7 +25,7 @@ class ResearchAgent(BaseAgent, AgentInterface):
         self,
         input: str,
     ) -> str:
-        relevant_memories = await self.memory_store.recall(
+        relevant_memories = await self.memory_store.recall_relevant(
             input + self.context
         )
 

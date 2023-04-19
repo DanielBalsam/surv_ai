@@ -16,7 +16,12 @@ class MemoryStoreInterface(Protocol):
     ):
         ...
 
-    async def recall(self, input: str, number=5, **kwargs) -> list[Memory]:
+    async def recall_relevant(
+        self, input: str, number=5, **kwargs
+    ) -> list[Memory]:
+        ...
+
+    async def recall_recent(self, number=5, **kwargs) -> list[Memory]:
         ...
 
     async def add_text(

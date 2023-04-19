@@ -20,6 +20,8 @@ class DecisionAgent(BaseAgent, AgentInterface):
 
         You must make a decision based on the information provided to you.
 
+        You may not respond with "I don't know" or "I don't understand".
+
         You may only respond with a single word, or proper noun.
         """
 
@@ -27,7 +29,7 @@ class DecisionAgent(BaseAgent, AgentInterface):
         self,
         input: str,
     ) -> str:
-        relevant_memories = await self.memory_store.recall(
+        relevant_memories = await self.memory_store.recall_relevant(
             input + self.context
         )
 

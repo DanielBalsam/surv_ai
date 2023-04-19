@@ -30,7 +30,7 @@ class LocalMemoryStore(MemoryStoreInterface):
     async def add_memory(self, memory: Memory):
         self.memories.append(memory)
 
-    async def recall(self, input: str, number=5) -> list[Memory]:
+    async def recall_relevant(self, input: str, number=5) -> list[Memory]:
         embedding = self.get_embedding(input)
 
         _, indices = VectorSearch.sort_by_similarity(
@@ -40,6 +40,9 @@ class LocalMemoryStore(MemoryStoreInterface):
         )
 
         return [self.memories[i] for i in indices[:number]]
+
+    async def recall_recent(self, number=5) -> list[Memory]:
+        return self.memories[-number:]
 
     @staticmethod
     def memories_as_list(memories: list[Memory]) -> str:

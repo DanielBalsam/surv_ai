@@ -66,7 +66,7 @@ class Toolbelt(ToolbeltInterface):
         original_prompt: str,
         memory_store: MemoryStoreInterface,
     ):
-        relevant_memories = await memory_store.recall(original_prompt)
+        relevant_memories = await memory_store.recall_relevant(original_prompt)
 
         prompt = self._get_toolbelt_prompt(
             original_prompt, memory_store.memories_as_list(relevant_memories)
