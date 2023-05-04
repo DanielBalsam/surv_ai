@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, Optional
 
 
 from pydantic import BaseModel
@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class PromptMessage(BaseModel):
     role: str
     content: str
+    name: Optional[str]
 
 
 class Prompt(BaseModel):
@@ -17,5 +18,7 @@ class LargeLanguageModelClientInterface(Protocol):
     def __init__(self, *args, **kwargs):
         ...
 
-    async def get_completions(self, prompts: list[Prompt]) -> list[str]:
+    async def get_completions(
+        self, prompts: list[Prompt], **_hyperparameters
+    ) -> list[str]:
         ...

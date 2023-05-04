@@ -33,9 +33,15 @@ class VectorSearch:
 
     @staticmethod
     def faiss_search(embeddings, query, k=10):
-        index = faiss.IndexFlatL2(embeddings.shape[1])
-        index.add(embeddings)
-        return index.search(query, k)
+        embeddings = np.array(embeddings)
+        index = faiss.IndexIDMap(faiss.IndexFlatIP(embeddings.shape[1]))
+        index.add_with_ids(embeddings, np.array(range(0, len(embeddings))))
+        search_results = index.search(
+            x=np.array([query]),
+            k=len(embeddings) if len(embeddings) < k else k,
+        )
+
+        return search_results
 
     @classmethod
     def sort_by_similarity(
@@ -65,7 +71,8 @@ class VectorSearch:
             similarities = cls.cosine_similarity(embeddings, query)
             indices = np.argsort(similarities)[::-1]
         elif type == VectorSearchType.FAISS:
-            similarities, indices = cls.faiss_search(embeddings, query)
+            similarities, rank = cls.faiss_search(embeddings, query)
+            indices = np.argsort(rank[0])[::-1]
 
         if similarity_threshold:
             normalized_similarities = similarities / np.max(similarities)

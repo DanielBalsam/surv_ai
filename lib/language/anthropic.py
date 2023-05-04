@@ -1,4 +1,5 @@
 import asyncio
+
 from enum import StrEnum
 from aiohttp import ClientSession
 
@@ -9,14 +10,11 @@ class GPTModel(StrEnum):
     TURBO = "gpt-3.5-turbo"
 
 
-MODEL_TOKEN_LIMITS = {GPTModel.TURBO: 4096}
-
-
 class GPTClient(LargeLanguageModelClientInterface):
     def __init__(
         self,
         api_key: str,
-        max_tokens: int = 500,
+        max_tokens: int = 1000,
         model=GPTModel.TURBO,
     ):
         self.api_key = api_key
@@ -29,47 +27,14 @@ class GPTClient(LargeLanguageModelClientInterface):
         prompt: Prompt,
         attempt=1,
         presence_penalty=0,
-        frequency_penalty=0,
         temperature=1,
-        top_p=1,
     ) -> str:
-        MAX_PROMPT_TOKENS = (
-            MODEL_TOKEN_LIMITS.get(self.model) - self.max_tokens
-        )
-        messages = [
-            {
-                "role": message.role,
-                "content": " ".join(message.content.split()),
-            }
-            for message in prompt.messages
-        ]
-        approximate_tokens = len(str(messages).split(" ")) * 1.5
-
-        while approximate_tokens > MAX_PROMPT_TOKENS:
-            if len(messages) == 1:
-                raise Exception("Initial prompt is too long.")
-
-            index_to_remove = None
-            for index, message in enumerate(messages):
-                if message["role"] == "system":
-                    continue
-
-                index_to_remove = index
-                break
-
-            if index_to_remove:
-                messages.pop(index_to_remove)
-
-            approximate_tokens = len(str(messages).split(" ")) * 1.6
-
         try:
             request = {
                 "model": self.model,
-                "messages": messages,
+                "messages": [message.dict() for message in prompt.messages],
                 "temperature": temperature,
-                "top_p": top_p,
                 "presence_penalty": presence_penalty,
-                "frequency_penalty": frequency_penalty,
                 "max_tokens": self.max_tokens,
             }
 
@@ -89,9 +54,11 @@ class GPTClient(LargeLanguageModelClientInterface):
 
             response.raise_for_status()
         except Exception as e:
-            print(e)
-            await asyncio.sleep(0.5)
+            if response_body:
+                raise Exception(response_body)
             if attempt < 5:
+                if e.status == 400:
+                    prompt.messages = prompt.messages[1:]
                 return await self._get_completion(session, prompt, attempt + 1)
             else:
                 raise e
@@ -99,12 +66,7 @@ class GPTClient(LargeLanguageModelClientInterface):
         return response_body["choices"][0]["message"]["content"]
 
     async def get_completions(
-        self,
-        prompts: list[Prompt],
-        presence_penalty=0,
-        frequency_penalty=0,
-        temperature=1,
-        top_p=1,
+        self, prompts: list[Prompt], presence_penalty=0, temperature=1
     ) -> list[str]:
         async with ClientSession() as session:
             return await asyncio.gather(
@@ -113,9 +75,7 @@ class GPTClient(LargeLanguageModelClientInterface):
                         session,
                         prompt,
                         presence_penalty=presence_penalty,
-                        frequency_penalty=frequency_penalty,
                         temperature=temperature,
-                        top_p=top_p,
                     )
                     for prompt in prompts
                 ],

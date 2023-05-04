@@ -1,7 +1,6 @@
 from typing import Optional
 from bs4 import BeautifulSoup
 import re
-import numpy as np
 import asyncio
 
 from aiohttp import ClientSession
@@ -15,13 +14,14 @@ from lib.language.interfaces import (
     Prompt,
     PromptMessage,
 )
+from lib.agent_log import agent_log
 
 from .interfaces import QueryToolInterface
 
 
 class WikipediaTool(QueryToolInterface):
     instruction = """
-        `WIKIPEDIA(query)` - search Wikipedia for additional information.
+        `WIKIPEDIA(searchTerms)` - use a no more than three keywords to search Wikipedia for additional information.
     """
     command = r"WIKIPEDIA\((.+)\)"
 
@@ -35,9 +35,12 @@ class WikipediaTool(QueryToolInterface):
     ):
         if not embeddings:
             embeddings = SentenceBertEmbedding()
+
         self.client = client
         self.n_pages = n_pages
         self.embeddings = embeddings
+
+        self._already_searched = dict()
 
     async def _search(self, session, query: str) -> list[str]:
         params = {
@@ -51,21 +54,34 @@ class WikipediaTool(QueryToolInterface):
             return [result["title"] for result in data["query"]["search"]]
 
     async def _get_page_text(self, session, page_title: str) -> str:
+        if page_title in self._already_searched:
+            return self._already_searched[page_title]
+
         params = {
             "action": "parse",
             "format": "json",
             "page": page_title,
             "prop": "text",
         }
+
         async with session.get(self._base_url, params=params) as response:
             data = await response.json()
-            html_content = data["parse"]["text"]["*"]
 
-            soup = BeautifulSoup(html_content, "html.parser")
+            try:
+                html_content = data["parse"]["text"]["*"]
 
-            results = []
-            for paragraph in soup.find_all("p"):
-                results.append(paragraph.text)
+                soup = BeautifulSoup(html_content, "html.parser")
+
+                results = []
+                for paragraph in soup.find_all("p"):
+                    paragraph_text = paragraph.text.strip()
+
+                    if paragraph_text:
+                        results.append(paragraph_text)
+
+                self._already_searched[page_title] = results
+            except:
+                return ""
 
             return results
 
@@ -73,37 +89,42 @@ class WikipediaTool(QueryToolInterface):
         self,
         session,
         original_prompt: str,
-        relevant_context: str,
         page_title: str,
     ):
         paragraphs = await self._get_page_text(session, page_title)
 
-        most_relevant_paragraphs = (
-            self.get_most_relevant_information_from_page(
-                original_prompt,
-                relevant_context,
-                paragraphs,
-            )
-        )
-
         prompt = Prompt(
             messages=[
                 PromptMessage(
-                    content=f"""Please summarize the following text as it relates to the following query: '{original_prompt}'.
+                    content=f"""A user has asked you some questions:
                     
-                    Relevant context:
+                    {original_prompt}
 
-                    {relevant_context}
+                    All subsequent messages will be paragraphs from a Wikipedia article is entitled "{page_title}."
+
+                    Your job is to extract any useful information that might help someone answer these questions.
+
+                    Remember to include as much data and concrete examples as possible from the article.
+
+                    For each useful piece of information you extract, please state why it relates to the original questions.
                     """,
                     role="system",
                 ),
+                *[
+                    PromptMessage(
+                        content=paragraph, role="user", name="Article"
+                    )
+                    for paragraph in paragraphs
+                ],
                 PromptMessage(
-                    content="\n".join(most_relevant_paragraphs),
-                    role="user",
+                    role="assistant",
+                    content=f"I have read the Wikpedia article entitled {page_title} and some useful information is:",
                 ),
             ],
         )
-        response = await self.client.get_completions([prompt])
+        response = await self.client.get_completions(
+            [prompt], **{"temperature": 0.2}
+        )
 
         return response[0]
 
@@ -119,7 +140,7 @@ class WikipediaTool(QueryToolInterface):
         _, indices = VectorSearch.sort_by_similarity(
             paragraph_embeddings,
             prompt_embedding,
-            type=VectorSearchType.COSINE,
+            type=VectorSearchType.L2,
         )
 
         return [paragraphs[i] for i in indices[0:n_results]]
@@ -128,13 +149,14 @@ class WikipediaTool(QueryToolInterface):
         self,
         session: ClientSession,
         original_prompt: str,
-        relevant_context: str,
         page_title: str,
     ):
+        agent_log.thought(
+            f"......Learning Wikipedia page with title {page_title}......"
+        )
         page_summary = await self._ingest_page_information(
             session,
             original_prompt,
-            relevant_context,
             page_title,
         )
 
@@ -144,10 +166,45 @@ class WikipediaTool(QueryToolInterface):
 
         page_embeddings = self.embeddings.embed([page_summary])[0]
         return Memory(
-            text=f"You searched the Wikipedia page entitled {page_title}: {page_summary}",
+            text=f"Wikipedia page entitled {page_title}: {page_summary}",
             source=source,
             embedding=page_embeddings,
         )
+
+    async def _filter_relevant_pages(
+        self,
+        original_prompt: str,
+        relevant_context: str,
+        search_results: list[str],
+    ):
+        prompt = Prompt(
+            messages=[
+                PromptMessage(
+                    content=f"""Your job is to determine which, if any of the following article titles are relevant to a user's prompt.
+                                   
+                    Original prompt:
+                    
+                    '{original_prompt}'.
+                    
+                    Relevant context:
+
+                    {relevant_context}
+
+                    The next message will be the the list of articles separated by commas.
+
+                    Please return only the relevant article titles, also separated by commas.
+                    """,
+                    role="system",
+                ),
+                PromptMessage(
+                    content=", ".join(search_results),
+                    role="user",
+                ),
+            ],
+        )
+        response = (await self.client.get_completions([prompt]))[0]
+
+        return response
 
     async def use(
         self,
@@ -158,14 +215,18 @@ class WikipediaTool(QueryToolInterface):
         async with ClientSession() as session:
             search_results = await self._search(session, search_query)
 
-            if len(search_results) == 0:
+            relevant_results = (
+                await self._filter_relevant_pages(
+                    original_prompt, relevant_context, search_results
+                )
+            ).split(", ")
+
+            if len(relevant_results) == 0:
                 return []
 
             return await asyncio.gather(
                 *[
-                    self._ingest_pages(
-                        session, original_prompt, relevant_context, page_title
-                    )
-                    for page_title in search_results[: self.n_pages]
+                    self._ingest_pages(session, original_prompt, page_title)
+                    for page_title in relevant_results[: self.n_pages]
                 ]
             )

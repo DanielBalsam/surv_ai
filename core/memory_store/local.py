@@ -30,19 +30,59 @@ class LocalMemoryStore(MemoryStoreInterface):
     async def add_memory(self, memory: Memory):
         self.memories.append(memory)
 
-    async def recall_relevant(self, input: str, number=5) -> list[Memory]:
+    def filter_memories(
+        self,
+        include_sources: Optional[list[str]] = None,
+        exclude_sources: Optional[list[str]] = None,
+    ):
+        memories = self.memories
+        if include_sources:
+            memories = [
+                memory
+                for memory in memories
+                if memory.source in include_sources
+            ]
+        if exclude_sources:
+            memories = [
+                memory
+                for memory in memories
+                if memory.source not in exclude_sources
+            ]
+
+        return memories
+
+    async def recall_relevant(
+        self,
+        input: str,
+        n_memories=5,
+        include_sources: Optional[list[str]] = None,
+        exclude_sources: Optional[list[str]] = None,
+    ) -> list[Memory]:
         embedding = self.get_embedding(input)
 
         _, indices = VectorSearch.sort_by_similarity(
-            [m.embedding for m in self.memories],
-            [embedding],
+            [
+                m.embedding
+                for m in self.filter_memories(include_sources, exclude_sources)
+            ],
+            embedding,
             type=VectorSearchType.L2,
         )
 
-        return [self.memories[i] for i in indices[:number]]
+        return [self.memories[i] for i in indices[:n_memories]]
 
-    async def recall_recent(self, number=5) -> list[Memory]:
-        return self.memories[-number:]
+    async def recall_recent(
+        self,
+        n_memories=5,
+        include_sources: Optional[list[str]] = None,
+        exclude_sources: Optional[list[str]] = None,
+    ) -> list[Memory]:
+        return [
+            memory
+            for memory in self.filter_memories(
+                include_sources, exclude_sources
+            )
+        ][-n_memories:]
 
     @staticmethod
     def memories_as_list(memories: list[Memory]) -> str:

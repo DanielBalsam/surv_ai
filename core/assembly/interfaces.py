@@ -5,10 +5,13 @@ from lib.language.interfaces import LargeLanguageModelClientInterface
 
 
 class AssemblyResponse(BaseModel):
-    final_response: str
-    percent_in_favor: float
+    in_favor: int
+    against: int
+    undecided: int
 
-    dissenting_responses: list[str]
+    percent_in_favor: float
+    error_bar: float
+    summaries: list[list[str]]
 
 
 class AssemblyInterface(Protocol):
@@ -17,5 +20,5 @@ class AssemblyInterface(Protocol):
     ):
         ...
 
-    async def ask(self, input: str) -> AssemblyResponse:
+    async def prompt(self, input: str) -> AssemblyResponse:
         ...

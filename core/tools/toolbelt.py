@@ -1,11 +1,12 @@
 import re
+from core.conversation.interfaces import ConversationInterface
 
 from lib.language.interfaces import (
     LargeLanguageModelClientInterface,
     Prompt,
     PromptMessage,
 )
-from core.memory_store.interfaces import MemoryStoreInterface
+from lib.agent_log import agent_log
 from .interfaces import ToolbeltInterface, ToolInterface
 from .noop import NoopTool
 
@@ -16,7 +17,8 @@ class Toolbelt(ToolbeltInterface):
         client: LargeLanguageModelClientInterface,
         tools: list[ToolInterface],
     ):
-        tools.append(NoopTool(client))
+        # if tools:
+        #     tools.append(NoopTool(client))
 
         self.client = client
         self.tools = tools
@@ -30,13 +32,13 @@ class Toolbelt(ToolbeltInterface):
         )
 
     def _get_toolbelt_prompt(
-        self, original_prompt: str, memory_list: str
+        self, original_prompt: str, conversation: str
     ) -> str:
         return Prompt(
             messages=[
                 PromptMessage(
                     role="system",
-                    content=f"""A user will ask you a question.
+                    content=f"""A user will prompt you with an assertion.
                     
                     These are the commands available to you:
 
@@ -51,9 +53,11 @@ class Toolbelt(ToolbeltInterface):
                 ),
                 PromptMessage(
                     role="assistant",
-                    content=f"""This is what I already know:
+                    content=f"""This is what the user has been talking about:
                     
-                    {memory_list}
+                    ```
+                    {conversation}
+                    ```
                     
                     With that in mind, I will execute the following command:
                     """,
@@ -64,32 +68,38 @@ class Toolbelt(ToolbeltInterface):
     async def inspect(
         self,
         original_prompt: str,
-        memory_store: MemoryStoreInterface,
+        conversation: ConversationInterface,
+        attempt=1,
     ):
-        relevant_memories = await memory_store.recall_relevant(original_prompt)
-
         prompt = self._get_toolbelt_prompt(
-            original_prompt, memory_store.memories_as_list(relevant_memories)
+            original_prompt, conversation.as_string()
         )
 
-        response = (await self.client.get_completions([prompt]))[0]
+        response = (
+            await self.client.get_completions([prompt], **{"temperature": 0.4})
+        )[0]
 
         for tool in self.tools:
             match = re.match(tool.command, response)
 
             if match:
+                memories = []
                 for args in match.groups():
-                    relevant_context = memory_store.memories_as_list(
-                        relevant_memories
+                    relevant_context = conversation.as_string()
+
+                    agent_log.thought(
+                        f"...Agent is using tool {tool.__class__.__name__} with args {args}..."
                     )
-                    memories = await tool.use(
+
+                    memories += await tool.use(
                         original_prompt, relevant_context, args
                     )
 
-                    if memories:
-                        for memory in memories:
-                            await memory_store.add_memory(memory)
+                    if not memories and attempt < 3:
+                        memories = await self.inspect(
+                            original_prompt, conversation, attempt=attempt + 1
+                        )
 
-                return True
+                return memories
 
         return False

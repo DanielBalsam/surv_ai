@@ -1,7 +1,15 @@
 from typing import Protocol, Optional
+from pydantic import BaseModel
 from core.tools.interfaces import ToolbeltInterface
 
 from lib.language.interfaces import LargeLanguageModelClientInterface
+
+
+class TeamResult(BaseModel):
+    points_in_favor: int
+    points_against: int
+    points_undecided: int
+    summary: list[str]
 
 
 class TeamInterface(Protocol):
@@ -16,5 +24,5 @@ class TeamInterface(Protocol):
     ):
         ...
 
-    async def prompt(self, input: str, **kwargs) -> str:
+    async def prompt(self, input: str, **kwargs) -> TeamResult:
         ...

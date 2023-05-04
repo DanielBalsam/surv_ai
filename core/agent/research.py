@@ -1,3 +1,6 @@
+from typing import Optional
+from core.conversation.interfaces import ConversationInterface
+from lib.agent_log import agent_log
 from lib.language.interfaces import (
     Prompt,
     PromptMessage,
@@ -8,54 +11,173 @@ from .base import BaseAgent
 
 
 class ResearchAgent(BaseAgent, AgentInterface):
-    def _get_initial_prompt_text(self, memory_list: str):
-        return f"""        
-        Your job is to see relevant information to find an answer to subsequent prompt.
+    def _get_initial_prompt_text(self, input: str):
+        return f"""     
+        You are pretending to be an researcher named {self.name} 
+        who is concerned with assessing the truth of the following statement:
 
-        Domain of question: {self.context}
+        {input}
+           
+        You must decide whether you think the statement is more likely to be true or false.
 
-        {memory_list}
+        Include citations from your research.
 
-        The next message will be a question from the user.
+        You may only use information directly found in your research.
 
-        Please explain your thinking, but never respond with more than a few sentences.  
+        However, ultimately you must decide whether you think the statement is "true" or "false."
+
+        Walk through your thinking step by step, before announcing your conclusion.
+
+        Regardless of how ambigious the situation is you must say what you think is more likely to be true.
         """
+
+    def _get_question_prompt_text(self, input: str):
+        return f"""     
+        You are pretending to be an researcher named {self.name} 
+        who is concerned with assessing the truth of the following statement:
+
+        {input}
+           
+        The next few message will be what you've learned after extensive research.
+
+        You must decide whether you think the statement is more likely to be true or false.
+
+        To do this you may ask a question.
+
+        Think about what would be useful to know to determine if the statement is true or false.
+        
+        Express the question in as few words as possible.
+
+        Please respond only with the question you wish to ask.
+        """
+
+    def _get_heuristics_prompt_text(self, input: str):
+        return f"""     
+        You are pretending to be an researcher named {self.name} 
+        who is concerned with assessing the truth of the following statement:
+
+        {input}
+           
+        The next few message will be what you've learned after extensive research.
+
+        You must decide whether you think the statement is more likely to be true or false.
+
+        You should put together a list of heuristics that you can evaluate to determine
+        the validity of the statement.
+        """
+
+    async def _build_questions_prompt(
+        self,
+        input: str,
+        conversation: Optional[ConversationInterface] = None,
+        already_asked: list[str] = [],
+    ) -> Prompt:
+        messages = [
+            PromptMessage(
+                role="system",
+                content=self._get_question_prompt_text(input),
+            ),
+            *[
+                PromptMessage(
+                    role="assistant",
+                    content=question,
+                )
+                for question in already_asked
+            ],
+            PromptMessage(
+                role="assistant",
+                content=f"""The statement I have been asked to assess is:
+
+                {input}
+
+                A question that would help determine if this is true or false would be:
+                """,
+            ),
+        ]
+
+        return Prompt(messages=messages)
+
+    async def _build_heuristics_prompt(
+        self,
+        input: str,
+        relevant_memories: str,
+    ) -> Prompt:
+        messages = [
+            PromptMessage(
+                role="system",
+                content=self._get_heuristics_prompt_text(input),
+            ),
+            PromptMessage(
+                role="assistant",
+                content=f"""The statement I have been asked to assess is:
+
+                {input}
+
+                In my research I have found:
+
+                {self.memory_store.memories_as_list(relevant_memories)}
+
+                Given that, here is how I think I should go about thinking about the statement
+                in order to assess it's validity:
+                """,
+            ),
+        ]
+
+        return Prompt(messages=messages)
+
+    async def conduct_research(self, input, conversation):
+        await self.use_tools(input, conversation)
 
     async def _build_completion_prompt(
         self,
         input: str,
-    ) -> str:
-        relevant_memories = await self.memory_store.recall_relevant(
-            input + self.context
+        conversation: Optional[ConversationInterface] = None,
+    ) -> Prompt:
+        await self.conduct_research(input, conversation)
+
+        relevant_memories = await self.memory_store.recall_recent(
+            n_memories=self.n_memories_per_prompt,
+            exclude_sources=["Strongly held beliefs", "Common sense"],
         )
 
-        self.messages = [
+        heuristics = (
+            await self.client.get_completions(
+                [
+                    await self._build_heuristics_prompt(
+                        input, relevant_memories
+                    )
+                ],
+                **self._hyperparameters,
+            )
+        )[0]
+
+        agent_log.thought(f"{self.name} thinks: {heuristics}")
+
+        messages = [
             PromptMessage(
                 role="system",
-                content=self._get_initial_prompt_text(
-                    self.memory_store.memories_as_list(relevant_memories),
-                ),
+                content=self._get_initial_prompt_text(input),
             ),
-            PromptMessage(role="user", content=input),
+            PromptMessage(
+                role="assistant",
+                content=f"""As {self.name}, a research trying to determine if the following
+                statement is true or false:
+
+                {input}
+
+                In my research I have found:
+
+                {self.memory_store.memories_as_list(relevant_memories)}
+
+                I have decided to use the following approach to assess the validity of the statement:
+
+                {heuristics} 
+
+                Therefore, I have made a decision about whether the statement is true or false. 
+                
+                I will now walk through my reasoning step by step:
+                """,
+            ),
         ]
 
-        return Prompt(messages=self.messages)
-
-    async def _build_context_prompt(self, input: str) -> str:
-        return Prompt(
-            messages=[
-                PromptMessage(
-                    role="system",
-                    content=f"""A user will ask you a question.
-
-                    Your job will be to categorize this question with a few words.
-
-                    For instance, if the question is "What is the capital of France?", then you might respond with "geography".
-                    """,
-                ),
-                PromptMessage(
-                    role="user",
-                    content=f"""{input}""",
-                ),
-            ]
-        )
+        return Prompt(messages=messages)
