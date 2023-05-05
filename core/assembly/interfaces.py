@@ -8,6 +8,7 @@ class AssemblyResponse(BaseModel):
     in_favor: int
     against: int
     undecided: int
+    error: int
 
     percent_in_favor: float
     error_bar: float

@@ -64,7 +64,10 @@ class NewYorkTimesTool(QueryToolInterface):
                 return [result for result in data["response"]["docs"]]
             except Exception:
                 if attempt < 3:
-                    return await self._search(session, query)
+                    return await self._search(session, query, attempt + 1)
+                else:
+                    response.raise_for_status()
+                    raise Exception
 
     async def _get_page_text(self, _, web_url: str) -> str:
         if web_url in self._already_searched:
