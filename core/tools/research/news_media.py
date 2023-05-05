@@ -33,6 +33,8 @@ class NewsMediaTool(QueryToolInterface):
         self,
         client: LargeLanguageModelClientInterface,
         embeddings: Optional[EmbeddingInterface] = None,
+        start_date=None,
+        end_date=None,
         n_pages=1,
     ):
         if not embeddings:
@@ -42,6 +44,9 @@ class NewsMediaTool(QueryToolInterface):
         self.n_pages = n_pages
         self.embeddings = embeddings
 
+        self.start_date = start_date
+        self.end_date = end_date
+
         self._already_searched = dict()
 
     async def _search(self, session, query: str) -> list[str]:
@@ -49,7 +54,14 @@ class NewsMediaTool(QueryToolInterface):
             "key": os.getenv("GOOGLE_API_KEY", ""),
             "cx": os.getenv("GOOGLE_SEARCH_ENGINE_ID", ""),
             "q": re.sub(r"[^A-Za-z0-9 ]+", "", query),
+            "num": self.n_pages,
         }
+
+        if self.start_date:
+            params["q"] += f" after:{self.start_date}"
+
+        if self.end_date:
+            params["q"] += f" before:{self.end_date}"
 
         async with session.get(self._base_url, params=params) as response:
             data = await response.json()
@@ -60,7 +72,9 @@ class NewsMediaTool(QueryToolInterface):
             return self._already_searched[web_url]
 
         data = subprocess.run(
-            "curl -s " + web_url, shell=True, capture_output=True
+            "curl -s " + web_url + ' --header "User-Agent: Mozilla/5.0"',
+            shell=True,
+            capture_output=True,
         ).stdout.decode("utf-8")
 
         soup = BeautifulSoup(data, "html.parser")
@@ -135,8 +149,9 @@ class NewsMediaTool(QueryToolInterface):
         relevant_context: str,
         result: dict,
     ):
+        metatags = result["pagemap"]["metatags"][0]
         agent_log.thought(
-            f"......Retrieving article with title {result['title']}......"
+            f"......Retrieving article with title {metatags['og:title']}......"
         )
         page_summary = await self._ingest_page_information(
             session,
@@ -147,7 +162,7 @@ class NewsMediaTool(QueryToolInterface):
 
         page_embeddings = self.embeddings.embed([page_summary])[0]
         return Memory(
-            text=f"Article entitled \"{result['title']}\": {page_summary}",
+            text=f"{metatags['og:site_name']} article entitled \"{metatags['og:title']}\": {page_summary}",
             source=result["link"],
             embedding=page_embeddings,
         )
