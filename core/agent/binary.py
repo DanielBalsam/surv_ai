@@ -24,10 +24,6 @@ class BinaryAgent(BaseAgent, AgentInterface):
     async def _build_completion_prompt(
         self, input: str, conversation=None
     ) -> str:
-        relevant_memories = await self.memory_store.recall_relevant(
-            input, n_memories=self.n_memories_per_prompt
-        )
-
         self.messages = [
             PromptMessage(
                 role="system",
@@ -35,7 +31,7 @@ class BinaryAgent(BaseAgent, AgentInterface):
             ),
             PromptMessage(
                 role="user",
-                content=self.memory_store.memories_as_list(relevant_memories),
+                content=conversation.as_string(),
             ),
         ]
 

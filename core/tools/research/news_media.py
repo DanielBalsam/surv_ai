@@ -27,7 +27,7 @@ class NewsMediaTool(QueryToolInterface):
     """
     command = r"NEWS\((.+)\)"
 
-    _base_url = "https://www.googleapis.com/customsearch/v1"
+    _base_url = "https://www.googleapis.com/customsearch/v1/siterestrict"
 
     def __init__(
         self,
@@ -50,22 +50,36 @@ class NewsMediaTool(QueryToolInterface):
         self._already_searched = dict()
 
     async def _search(self, session, query: str) -> list[str]:
-        params = {
-            "key": os.getenv("GOOGLE_API_KEY", ""),
-            "cx": os.getenv("GOOGLE_SEARCH_ENGINE_ID", ""),
-            "q": re.sub(r"[^A-Za-z0-9 ]+", "", query),
-            "num": self.n_pages,
-        }
+        start = 1
+        results = []
 
-        if self.start_date:
-            params["q"] += f" after:{self.start_date}"
+        while len(results) < self.n_pages:
+            params = {
+                "key": os.getenv("GOOGLE_API_KEY", ""),
+                "cx": os.getenv("GOOGLE_SEARCH_ENGINE_ID", ""),
+                "q": re.sub(r"[^A-Za-z0-9 ]+", "", query),
+                "start": start,
+                "num": 10,
+            }
 
-        if self.end_date:
-            params["q"] += f" before:{self.end_date}"
+            if self.start_date:
+                params["q"] += f" after:{self.start_date}"
 
-        async with session.get(self._base_url, params=params) as response:
-            data = await response.json()
-            return [result for result in data["items"]]
+            if self.end_date:
+                params["q"] += f" before:{self.end_date}"
+
+            async with session.get(self._base_url, params=params) as response:
+                data = await response.json()
+
+            new_records = data["items"]
+
+            if not new_records:
+                break
+
+            results += new_records
+            start += 10
+
+        return results
 
     async def _get_page_text(self, _, web_url: str) -> str:
         if web_url in self._already_searched:
@@ -91,56 +105,44 @@ class NewsMediaTool(QueryToolInterface):
         self,
         session,
         original_prompt: str,
-        relevant_context: str,
+        title: str,
+        publication: str,
         web_url: str,
     ):
         paragraphs = await self._get_page_text(session, web_url)
 
-        most_relevant_paragraphs = (
-            self.get_most_relevant_information_from_page(
-                original_prompt,
-                relevant_context,
-                paragraphs,
-            )
-        )
-
         prompt = Prompt(
             messages=[
                 PromptMessage(
-                    content=f"""Please summarize the following text as it relates to the following query: '{original_prompt}'.
+                    content=f"""A user has asked you some questions:
                     
-                    Relevant context:
+                    {original_prompt}
 
-                    {relevant_context}
+                    All subsequent messages will be paragraphs from a {publication} article titled "{title}."
+
+                    Your job is to extract any useful information that might help someone answer these questions.
+
+                    Remember to include as much data and concrete examples as possible from the article.
+
+                    For each useful piece of information you extract, please state why it relates to the original questions.
                     """,
                     role="system",
                 ),
+                *[
+                    PromptMessage(
+                        content=paragraph, role="user", name="Article"
+                    )
+                    for paragraph in paragraphs
+                ],
                 PromptMessage(
-                    content="\n".join(most_relevant_paragraphs),
-                    role="user",
+                    role="assistant",
+                    content=f"I have read the Wikpedia article entitled {title} and some useful information is:",
                 ),
             ],
         )
         response = await self.client.get_completions([prompt])
 
         return response[0]
-
-    def get_most_relevant_information_from_page(
-        self,
-        query: str,
-        relevant_context: str,
-        paragraphs: list[str],
-        n_results=10,
-    ):
-        prompt_embedding = self.embeddings.embed([query + relevant_context])[0]
-        paragraph_embeddings = self.embeddings.embed(paragraphs)
-        _, indices = VectorSearch.sort_by_similarity(
-            paragraph_embeddings,
-            prompt_embedding,
-            type=VectorSearchType.L2,
-        )
-
-        return [paragraphs[i] for i in indices[0:n_results]]
 
     async def _ingest_pages(
         self,
@@ -150,19 +152,24 @@ class NewsMediaTool(QueryToolInterface):
         result: dict,
     ):
         metatags = result["pagemap"]["metatags"][0]
+
+        publication = metatags.get("og:site_name", "news")
+        title = metatags.get("og:title", result["title"])
+
         agent_log.thought(
-            f"......Retrieving article with title {metatags['og:title']}......"
+            f"......Retrieving {publication} article with title {title}......"
         )
         page_summary = await self._ingest_page_information(
             session,
             original_prompt,
-            relevant_context,
+            title,
+            publication,
             result["link"],
         )
 
         page_embeddings = self.embeddings.embed([page_summary])[0]
         return Memory(
-            text=f"{metatags['og:site_name']} article entitled \"{metatags['og:title']}\": {page_summary}",
+            text=f'{publication} article entitled "{title}": {page_summary}',
             source=result["link"],
             embedding=page_embeddings,
         )
@@ -179,11 +186,9 @@ class NewsMediaTool(QueryToolInterface):
             if len(search_results) == 0:
                 return []
 
-            return await asyncio.gather(
-                *[
-                    self._ingest_pages(
-                        session, original_prompt, relevant_context, web_url
-                    )
-                    for web_url in search_results[: self.n_pages]
-                ]
-            )
+            return [
+                await self._ingest_pages(
+                    session, original_prompt, relevant_context, web_url
+                )
+                for web_url in search_results[: self.n_pages]
+            ]

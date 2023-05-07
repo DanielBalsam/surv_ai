@@ -4,6 +4,10 @@ from re import Pattern
 from lib.language.interfaces import LargeLanguageModelClientInterface
 
 
+class NoMemoriesFoundException(Exception):
+    ...
+
+
 class ToolInterface(Protocol):
     instruction: str
     command: Pattern

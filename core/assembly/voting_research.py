@@ -1,7 +1,8 @@
 from thefuzz import process, fuzz
 import asyncio
+from core.memory_store.interfaces import Memory
 
-from core.tools.interfaces import ToolbeltInterface
+from core.tools.interfaces import NoMemoriesFoundException, ToolbeltInterface
 from .interfaces import AssemblyInterface, AssemblyResponse
 from core.agent.research import ResearchAgent
 from core.agent.binary import BinaryAgent
@@ -13,8 +14,8 @@ class VotingResearcherAssembly(AssemblyInterface):
         self,
         client,
         toolbelt: ToolbeltInterface,
-        n_agents=50,
-        max_concurrency=25,
+        n_agents=10,
+        max_concurrency=10,
     ):
         self.client = client
         self.toolbelt = toolbelt
@@ -22,25 +23,37 @@ class VotingResearcherAssembly(AssemblyInterface):
         self.n_agents = n_agents
         self.max_concurrency = max_concurrency
 
-    async def _conduct_research(self, prompt: str, summaries):
+    async def _conduct_research(
+        self,
+        prompt: str,
+        summaries: Conversation,
+        relevant_articles: list[Memory],
+    ):
         try:
             research_agent = ResearchAgent(
                 self.client,
                 toolbelt=self.toolbelt,
-                n_memories_per_prompt=10,
-                _hyperparameters={"temperature": 0.2},
+                n_memories_per_prompt=20,
+                _hyperparameters={"temperature": 0.4},
             )
 
-            response = await research_agent.prompt(prompt, Conversation())
+            for article in relevant_articles:
+                await research_agent.memory_store.add_memory(article)
 
-            summaries.add(response, "Researcher", research_agent._color)
+            response_conversation = Conversation()
+            response = await research_agent.prompt(
+                prompt, response_conversation
+            )
+
+            response_conversation.add(
+                response, "Researcher", research_agent._color
+            )
 
             binary_agent = BinaryAgent(
                 self.client, _hyperparameters={"temperature": 0}
             )
-            await binary_agent.teach(response)
 
-            decision = await binary_agent.prompt(prompt)
+            decision = await binary_agent.prompt(prompt, response_conversation)
             summaries.add(decision, "Decision", binary_agent._color)
 
             options = ["true", "false", "undecided"]
@@ -49,6 +62,8 @@ class VotingResearcherAssembly(AssemblyInterface):
             )[0]
 
             return coerced_decision
+        except NoMemoriesFoundException:
+            return "undecided"
         except Exception:
             return "error"
 
@@ -57,6 +72,8 @@ class VotingResearcherAssembly(AssemblyInterface):
 
         summaries = Conversation()
         agents = 0
+
+        relevant_articles = await self.toolbelt.inspect(prompt, Conversation())
 
         while agents < self.n_agents:
             coroutines = []
@@ -68,7 +85,11 @@ class VotingResearcherAssembly(AssemblyInterface):
                 )
 
             for _ in range(min(self.max_concurrency, self.n_agents - agents)):
-                coroutines.append(self._conduct_research(prompt, summaries))
+                coroutines.append(
+                    self._conduct_research(
+                        prompt, summaries, relevant_articles
+                    )
+                )
                 agents += 1
 
             decisions = await asyncio.gather(*coroutines)
@@ -90,5 +111,5 @@ class VotingResearcherAssembly(AssemblyInterface):
             error=results["error"],
             percent_in_favor=percent_in_favor,
             error_bar=error_bars,
-            summaries=[[summary.text] for summary in summaries],
+            summaries=[],
         )

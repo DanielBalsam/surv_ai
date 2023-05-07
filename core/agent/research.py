@@ -18,13 +18,13 @@ class ResearchAgent(BaseAgent, AgentInterface):
 
         {input}
            
-        You must decide whether you think the statement is more likely to be true or false.
+        You must decide whether you think the statement is more likely to be mostly true or mostly false.
 
         Include citations from your research.
 
         You may only use information directly found in your research.
 
-        However, ultimately you must decide whether you think the statement is "true" or "false."
+        However, ultimately you must decide whether you think the statement is mostly "true" or mostly "false."
 
         Walk through your thinking step by step, before announcing your conclusion.
 
@@ -66,37 +66,6 @@ class ResearchAgent(BaseAgent, AgentInterface):
         the validity of the statement.
         """
 
-    async def _build_questions_prompt(
-        self,
-        input: str,
-        conversation: Optional[ConversationInterface] = None,
-        already_asked: list[str] = [],
-    ) -> Prompt:
-        messages = [
-            PromptMessage(
-                role="system",
-                content=self._get_question_prompt_text(input),
-            ),
-            *[
-                PromptMessage(
-                    role="assistant",
-                    content=question,
-                )
-                for question in already_asked
-            ],
-            PromptMessage(
-                role="assistant",
-                content=f"""The statement I have been asked to assess is:
-
-                {input}
-
-                A question that would help determine if this is true or false would be:
-                """,
-            ),
-        ]
-
-        return Prompt(messages=messages)
-
     async def _build_heuristics_prompt(
         self,
         input: str,
@@ -125,19 +94,13 @@ class ResearchAgent(BaseAgent, AgentInterface):
 
         return Prompt(messages=messages)
 
-    async def conduct_research(self, input, conversation):
-        await self.use_tools(input, conversation)
-
     async def _build_completion_prompt(
         self,
         input: str,
         conversation: Optional[ConversationInterface] = None,
     ) -> Prompt:
-        await self.conduct_research(input, conversation)
-
         relevant_memories = await self.memory_store.recall_recent(
             n_memories=self.n_memories_per_prompt,
-            exclude_sources=["Strongly held beliefs", "Common sense"],
         )
 
         heuristics = (
@@ -175,7 +138,7 @@ class ResearchAgent(BaseAgent, AgentInterface):
 
                 Therefore, I have made a decision about whether the statement is true or false. 
                 
-                I will now walk through my reasoning step by step:
+                Answer: Let's work this out in a step by step way to make sure we have the right answer.
                 """,
             ),
         ]

@@ -67,28 +67,6 @@ class BaseAgent(ABC):
     ) -> Prompt:
         ...
 
-    async def use_tools(
-        self, input: str, conversation: Optional[ConversationInterface] = None
-    ) -> tuple[str, str]:
-        question = input
-
-        question_prompt = await self._build_questions_prompt(
-            input, conversation
-        )
-        question = (await self.client.get_completions([question_prompt]))[0]
-
-        agent_log.thought(f"{self.name} wonders: {question}")
-
-        learned_knowledge = await self.toolbelt.inspect(question, conversation)
-
-        if learned_knowledge:
-            for memory in learned_knowledge:
-                agent_log.thought(f"{self.name} learned: {memory.text}")
-
-                await self.memory_store.add_memory(memory)
-
-        return question, learned_knowledge
-
     async def prompt(
         self, input: str, conversation: Optional[ConversationInterface] = None
     ) -> str:

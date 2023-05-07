@@ -7,8 +7,11 @@ from lib.language.interfaces import (
     PromptMessage,
 )
 from lib.agent_log import agent_log
-from .interfaces import ToolbeltInterface, ToolInterface
-from .noop import NoopTool
+from .interfaces import (
+    ToolbeltInterface,
+    ToolInterface,
+    NoMemoriesFoundException,
+)
 
 
 class Toolbelt(ToolbeltInterface):
@@ -38,7 +41,9 @@ class Toolbelt(ToolbeltInterface):
             messages=[
                 PromptMessage(
                     role="system",
-                    content=f"""A user will prompt you with an assertion.
+                    content=f"""A user will prompt you with a statement.
+
+                    You should conduct research to assess this statement.
                     
                     These are the commands available to you:
 
@@ -76,7 +81,7 @@ class Toolbelt(ToolbeltInterface):
         )
 
         response = (
-            await self.client.get_completions([prompt], **{"temperature": 0.4})
+            await self.client.get_completions([prompt], **{"temperature": 0.7})
         )[0]
 
         for tool in self.tools:
@@ -99,7 +104,9 @@ class Toolbelt(ToolbeltInterface):
                         memories = await self.inspect(
                             original_prompt, conversation, attempt=attempt + 1
                         )
+                    elif not memories:
+                        raise NoMemoriesFoundException()
 
                 return memories
 
-        return False
+        return []
