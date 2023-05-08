@@ -11,7 +11,7 @@ from core.tools.interfaces import NoMemoriesFoundException, ToolbeltInterface
 from .interfaces import AssemblyInterface, AssemblyResponse
 
 
-class VotingResearcherAssembly(AssemblyInterface):
+class ResearchAssembly(AssemblyInterface):
     def __init__(
         self,
         client,
@@ -36,7 +36,6 @@ class VotingResearcherAssembly(AssemblyInterface):
         try:
             research_agent = ResearchAgent(
                 self.client,
-                toolbelt=self.toolbelt,
                 n_knowledge_items_per_prompt=self.max_articles_per_agent,
                 _hyperparameters={"temperature": 0.4},
             )

@@ -14,10 +14,9 @@ interesting emergent behaviors.
 
 The abstraction in this repository that is capable of producing a multi-agent model is referred to as an `Assembly`.
 
-These models are ultimately a form of "sentiment analysis," in that the output of the models is only
+The models produced are ultimately a form of sentiment analysis, and thus the quality of the models is only
 as good as the data corpus that is provided. However, as demonstrated in the examples below, trends in `Assembly`
-produced models are able to map with surprising precision to trends observed in other statistical models assessing
-the same problem area.
+produced models are able to fit to trends observed in other statistical models assessing the same problem area.
 
 With further advances in large language models, and AI broadly, multi-agent modeling may continue to prove a useful
 paradigm for classification and regression models, and may become a valuable extra data point for researchers investigating
@@ -27,7 +26,7 @@ complex issues with many complex underlying variables.
 
 This project depends on `poetry` for package management. 
 
-Once you have Python 3.11, and Poetry, uou can set up the project locally by cloning and then running:
+Once you have Python 3.11, and Poetry, you can set up the project locally by cloning and then running:
 
 ```
 poetry install

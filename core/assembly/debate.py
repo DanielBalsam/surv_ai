@@ -123,7 +123,7 @@ class _DebateTeam:
         team_lead_thoughts = Conversation()
 
         agent_log.log_context(
-            f'{self.name} is starting a conversation about whether "{assertion}" is true.'
+            f'Initiating a debate about whether "{assertion}" is true.'
         )
 
         invertor = InvertorAgent(self.client)
