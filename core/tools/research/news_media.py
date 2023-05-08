@@ -1,29 +1,24 @@
-from typing import Optional
-from bs4 import BeautifulSoup
-import re
-import os
 import asyncio
-import subprocess
+import os
+import re
 
 from aiohttp import ClientSession
-from lib.vector.search import VectorSearch, VectorSearchType
-from core.embeddings.interfaces import EmbeddingInterface
-from core.embeddings.sbert import SentenceBertEmbedding
-from core.memory_store.interfaces import Memory
+from bs4 import BeautifulSoup
 
+from core.memory_store.interfaces import Memory
+from lib.agent_log import agent_log
 from lib.language.interfaces import (
     LargeLanguageModelClientInterface,
     Prompt,
     PromptMessage,
 )
-from lib.agent_log import agent_log
 
 from .interfaces import QueryToolInterface
 
 
 class NewsMediaTool(QueryToolInterface):
     instruction = """
-        `NEWS(query)` - use keywords to search the New York Times for additional information.
+        `NEWS(query)` - use keywords to search the Google News for additional information.
     """
     command = r"NEWS\((.+)\)"
 
@@ -32,28 +27,26 @@ class NewsMediaTool(QueryToolInterface):
     def __init__(
         self,
         client: LargeLanguageModelClientInterface,
-        embeddings: Optional[EmbeddingInterface] = None,
         start_date=None,
         end_date=None,
-        n_pages=1,
+        n_articles=1,
+        max_percent_per_source=0.35,
     ):
-        if not embeddings:
-            embeddings = SentenceBertEmbedding()
-
         self.client = client
-        self.n_pages = n_pages
-        self.embeddings = embeddings
+        self.n_articles = n_articles
 
         self.start_date = start_date
         self.end_date = end_date
 
-        self._already_searched = dict()
+        self.max_percent_per_source = max_percent_per_source
 
     async def _search(self, session, query: str) -> list[str]:
         start = 1
         results = []
 
-        while len(results) < self.n_pages:
+        seen_sources = {}
+
+        while len(results) < self.n_articles:
             params = {
                 "key": os.getenv("GOOGLE_API_KEY", ""),
                 "cx": os.getenv("GOOGLE_SEARCH_ENGINE_ID", ""),
@@ -71,33 +64,50 @@ class NewsMediaTool(QueryToolInterface):
             async with session.get(self._base_url, params=params) as response:
                 data = await response.json()
 
-            new_records = data["items"]
+            try:
+                new_records = data["items"]
+            except Exception:
+                raise Exception("Call to Google API failed.")
 
             if not new_records:
                 break
+
+            if self.max_percent_per_source:
+                records_to_return = []
+
+                for record in new_records:
+                    if not seen_sources.get(record["displayLink"]):
+                        seen_sources[record["displayLink"]] = 0
+
+                    if seen_sources[record["displayLink"]] >= (
+                        self.n_articles * self.max_percent_per_source
+                    ):
+                        continue
+
+                    seen_sources[record["displayLink"]] += 1
+                    records_to_return.append(record)
+
+                new_records = records_to_return
 
             results += new_records
             start += 10
 
         return results
 
-    async def _get_page_text(self, _, web_url: str) -> str:
-        if web_url in self._already_searched:
-            return self._already_searched[web_url]
-
-        data = subprocess.run(
-            "curl -s " + web_url + ' --header "User-Agent: Mozilla/5.0"',
-            shell=True,
-            capture_output=True,
-        ).stdout.decode("utf-8")
+    async def _get_page_text(
+        self, session: ClientSession, web_url: str
+    ) -> str:
+        response = await session.get(
+            web_url,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        data = await response.text()
 
         soup = BeautifulSoup(data, "html.parser")
 
         results = []
         for paragraph in soup.find_all("p"):
             results.append(paragraph.text)
-
-        self._already_searched[web_url] = results
 
         return results
 
@@ -153,7 +163,7 @@ class NewsMediaTool(QueryToolInterface):
     ):
         metatags = result["pagemap"]["metatags"][0]
 
-        publication = metatags.get("og:site_name", "news")
+        publication = metatags.get("og:site_name", result["displayLink"])
         title = metatags.get("og:title", result["title"])
 
         agent_log.thought(
@@ -167,11 +177,9 @@ class NewsMediaTool(QueryToolInterface):
             result["link"],
         )
 
-        page_embeddings = self.embeddings.embed([page_summary])[0]
         return Memory(
             text=f'{publication} article entitled "{title}": {page_summary}',
             source=result["link"],
-            embedding=page_embeddings,
         )
 
     async def use(
@@ -186,9 +194,11 @@ class NewsMediaTool(QueryToolInterface):
             if len(search_results) == 0:
                 return []
 
-            return [
-                await self._ingest_pages(
-                    session, original_prompt, relevant_context, web_url
-                )
-                for web_url in search_results[: self.n_pages]
-            ]
+            return await asyncio.gather(
+                *[
+                    self._ingest_pages(
+                        session, original_prompt, relevant_context, web_url
+                    )
+                    for web_url in search_results[: self.n_articles]
+                ]
+            )

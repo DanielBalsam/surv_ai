@@ -1,20 +1,16 @@
+from abc import ABC, abstractmethod
+from random import Random, choice
 from typing import Optional
+
 from colorama import Fore
 
-from random import Random, choice
-
-from abc import ABC, abstractmethod
-
-from core.tools.interfaces import ToolbeltInterface
-from lib.language.interfaces import (
-    LargeLanguageModelClientInterface,
-    Prompt,
-)
+from core.conversation.interfaces import ConversationInterface
 from core.memory_store.interfaces import MemoryStoreInterface
 from core.memory_store.local import LocalMemoryStore
+from core.tools.interfaces import ToolbeltInterface
 from core.tools.toolbelt import Toolbelt
-from core.conversation.interfaces import ConversationInterface
 from lib.agent_log import agent_log
+from lib.language.interfaces import LargeLanguageModelClientInterface, Prompt
 
 
 class BaseAgent(ABC):

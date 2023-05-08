@@ -1,98 +1,30 @@
 from typing import Optional
+
 from core.conversation.interfaces import ConversationInterface
 from lib.agent_log import agent_log
-from lib.language.interfaces import (
-    Prompt,
-    PromptMessage,
-)
+from lib.language.interfaces import Prompt, PromptMessage
 
-from .interfaces import AgentInterface
 from .base import BaseAgent
+from .interfaces import AgentInterface
 
 
 class ResearchAgent(BaseAgent, AgentInterface):
-    def _get_initial_prompt_text(self, input: str):
+    def _get_initial_prompt_text(self, input: str, relevant_memories: str):
         return f"""     
-        You are pretending to be an researcher named {self.name} 
-        who is concerned with assessing the truth of the following statement:
+        You are a researcher named who is concerned with determining the truth of the following statement:
 
         {input}
            
         You must decide whether you think the statement is more likely to be mostly true or mostly false.
 
-        Include citations from your research.
+        The next set of messages will be a series of articles that you can use to help you make your decision.
 
-        You may only use information directly found in your research.
+        In your response please include as many citations from your research as possible.
 
-        However, ultimately you must decide whether you think the statement is mostly "true" or mostly "false."
+        Include both the publication title and the article title in your citation.
 
-        Walk through your thinking step by step, before announcing your conclusion.
-
-        Regardless of how ambigious the situation is you must say what you think is more likely to be true.
+        You must end your output simply with "Decision: True" or "Decision: False"
         """
-
-    def _get_question_prompt_text(self, input: str):
-        return f"""     
-        You are pretending to be an researcher named {self.name} 
-        who is concerned with assessing the truth of the following statement:
-
-        {input}
-           
-        The next few message will be what you've learned after extensive research.
-
-        You must decide whether you think the statement is more likely to be true or false.
-
-        To do this you may ask a question.
-
-        Think about what would be useful to know to determine if the statement is true or false.
-        
-        Express the question in as few words as possible.
-
-        Please respond only with the question you wish to ask.
-        """
-
-    def _get_heuristics_prompt_text(self, input: str):
-        return f"""     
-        You are pretending to be an researcher named {self.name} 
-        who is concerned with assessing the truth of the following statement:
-
-        {input}
-           
-        The next few message will be what you've learned after extensive research.
-
-        You must decide whether you think the statement is more likely to be true or false.
-
-        You should put together a list of heuristics that you can evaluate to determine
-        the validity of the statement.
-        """
-
-    async def _build_heuristics_prompt(
-        self,
-        input: str,
-        relevant_memories: str,
-    ) -> Prompt:
-        messages = [
-            PromptMessage(
-                role="system",
-                content=self._get_heuristics_prompt_text(input),
-            ),
-            PromptMessage(
-                role="assistant",
-                content=f"""The statement I have been asked to assess is:
-
-                {input}
-
-                In my research I have found:
-
-                {self.memory_store.memories_as_list(relevant_memories)}
-
-                Given that, here is how I think I should go about thinking about the statement
-                in order to assess it's validity:
-                """,
-            ),
-        ]
-
-        return Prompt(messages=messages)
 
     async def _build_completion_prompt(
         self,
@@ -103,42 +35,30 @@ class ResearchAgent(BaseAgent, AgentInterface):
             n_memories=self.n_memories_per_prompt,
         )
 
-        heuristics = (
-            await self.client.get_completions(
-                [
-                    await self._build_heuristics_prompt(
-                        input, relevant_memories
-                    )
-                ],
-                **self._hyperparameters,
-            )
-        )[0]
-
-        agent_log.thought(f"{self.name} thinks: {heuristics}")
-
         messages = [
             PromptMessage(
                 role="system",
-                content=self._get_initial_prompt_text(input),
+                content=self._get_initial_prompt_text(
+                    input,
+                    self.memory_store.memories_as_list(relevant_memories),
+                ),
             ),
+            *[
+                PromptMessage(
+                    content=memory.text,
+                    role="user",
+                    name=memory.source,
+                )
+                for memory in relevant_memories
+            ],
             PromptMessage(
                 role="assistant",
-                content=f"""As {self.name}, a research trying to determine if the following
-                statement is true or false:
+                content=f"""Question: is the following statement more likely to be true or false?
 
                 {input}
 
-                In my research I have found:
-
-                {self.memory_store.memories_as_list(relevant_memories)}
-
-                I have decided to use the following approach to assess the validity of the statement:
-
-                {heuristics} 
-
-                Therefore, I have made a decision about whether the statement is true or false. 
-                
-                Answer: Let's work this out in a step by step way to make sure we have the right answer.
+                Answer: In order to determine whether the provided statement is more likely to be true or false,
+                let's work this out in a step by step way to make sure we have the right answer.
                 """,
             ),
         ]

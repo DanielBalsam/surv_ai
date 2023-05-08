@@ -1,4 +1,5 @@
 from typing import Protocol
+
 from pydantic import BaseModel
 
 from lib.language.interfaces import LargeLanguageModelClientInterface
@@ -11,7 +12,7 @@ class AssemblyResponse(BaseModel):
     error: int
 
     percent_in_favor: float
-    error_bar: float
+    uncertainty: float
     summaries: list[list[str]]
 
 

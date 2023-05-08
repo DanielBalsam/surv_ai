@@ -1,6 +1,8 @@
 from typing import Optional
+
 from lib.agent_log import agent_log
-from .interfaces import ConversationInterface, ChatMessage
+
+from .interfaces import ChatMessage, ConversationInterface
 
 
 class Conversation(ConversationInterface):

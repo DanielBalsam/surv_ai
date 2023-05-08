@@ -197,11 +197,8 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
     async def _build_completion_prompt(
         self, input: str, conversation=None
     ) -> str:
-        await self.use_tools(input, conversation)
-
         relevant_memories = await self.memory_store.recall_recent(
             n_memories=self.n_memories_per_prompt,
-            exclude_sources=["Strongly held beliefs", "Common sense"],
         )
 
         rubric_prompt = self._get_rubric_prompt(

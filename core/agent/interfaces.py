@@ -1,4 +1,4 @@
-from typing import Protocol, Optional
+from typing import Optional, Protocol
 
 from core.memory_store.interfaces import MemoryStoreInterface
 from core.tools.interfaces import ToolbeltInterface

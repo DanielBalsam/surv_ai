@@ -1,4 +1,5 @@
 from enum import IntEnum
+
 from colorama import Fore, Style
 
 

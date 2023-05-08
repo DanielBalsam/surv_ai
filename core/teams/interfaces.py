@@ -1,7 +1,8 @@
-from typing import Protocol, Optional
-from pydantic import BaseModel
-from core.tools.interfaces import ToolbeltInterface
+from typing import Optional, Protocol
 
+from pydantic import BaseModel
+
+from core.tools.interfaces import ToolbeltInterface
 from lib.language.interfaces import LargeLanguageModelClientInterface
 
 

@@ -1,5 +1,4 @@
-from typing import Protocol, Optional
-
+from typing import Optional, Protocol
 
 from pydantic import BaseModel
 

@@ -1,5 +1,6 @@
 import asyncio
 from enum import StrEnum
+
 from aiohttp import ClientSession
 
 from .interfaces import LargeLanguageModelClientInterface, Prompt
@@ -89,10 +90,13 @@ class GPTClient(LargeLanguageModelClientInterface):
 
             response.raise_for_status()
         except Exception as e:
-            print(e)
-            await asyncio.sleep(0.5)
-            if attempt < 5:
-                return await self._get_completion(session, prompt, attempt + 1)
+            if response.status == 429:
+                await asyncio.sleep(0.5)
+
+                if attempt < 5:
+                    return await self._get_completion(
+                        session, prompt, attempt + 1
+                    )
             else:
                 raise e
 

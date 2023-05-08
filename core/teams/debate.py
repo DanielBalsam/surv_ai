@@ -1,15 +1,15 @@
-from core.conversation.conversation import Conversation
-from .interfaces import TeamInterface, TeamResult
-from .base import BaseTeam
-from thefuzz import process, fuzz
-
+from thefuzz import fuzz, process
 
 from core.agent.debate.analyst import AnalystAgent
 from core.agent.debate.select_winner import SelectWinnerAgent
-from core.agent.invertor import InvertorAgent
 from core.agent.debate.team_lead import TeamLeadAgent
-from core.knowledge_base.common_sense import CommonSense
+from core.agent.invertor import InvertorAgent
+from core.conversation.conversation import Conversation
+from core.memory_store.interfaces import Memory
 from lib.agent_log import agent_log
+
+from .base import BaseTeam
+from .interfaces import TeamInterface, TeamResult
 
 
 class DebateTeam(BaseTeam, TeamInterface):
@@ -56,7 +56,6 @@ class DebateTeam(BaseTeam, TeamInterface):
             },
         )
         await believer_agent.teach(assertion, source="Strongly held beliefs")
-        await CommonSense().teach_to_agent(believer_agent)
 
         debate.add(
             f"I believe {assertion}",
@@ -78,7 +77,6 @@ class DebateTeam(BaseTeam, TeamInterface):
         await skeptic_agent.teach(
             inverted_assertion, source="Strongly held beliefs"
         )
-        await CommonSense().teach_to_agent(skeptic_agent)
 
         debate.add(
             f"I believe {inverted_assertion}",
@@ -100,7 +98,9 @@ class DebateTeam(BaseTeam, TeamInterface):
 
         return believer_agent, skeptic_agent, team_lead_agent
 
-    async def _converse(self, assertion: str) -> TeamResult:
+    async def prompt(
+        self, assertion: str, relevant_articles: list[Memory]
+    ) -> TeamResult:
         debate = Conversation()
         team_lead_thoughts = Conversation()
 
@@ -116,6 +116,11 @@ class DebateTeam(BaseTeam, TeamInterface):
             skeptic_agent,
             team_lead_agent,
         ) = await self._init_agents(assertion, inverted_assertion, debate)
+
+        for article in relevant_articles:
+            await believer_agent.memory_store.add_memory(article)
+            await skeptic_agent.memory_store.add_memory(article)
+            await team_lead_agent.memory_store.add_memory(article)
 
         summaries = []
         points_in_favor = 0

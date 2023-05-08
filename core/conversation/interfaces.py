@@ -1,5 +1,7 @@
 from typing import Protocol
+
 from pydantic import BaseModel
+
 from lib.language.interfaces import PromptMessage
 
 

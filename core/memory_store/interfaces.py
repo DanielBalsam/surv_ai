@@ -1,12 +1,12 @@
-from typing import Any, Optional, Protocol
+from typing import Optional, Protocol
+
+from pydantic import BaseModel
+
 from lib.language.interfaces import LargeLanguageModelClientInterface
-from pydantic import BaseModel, Field
 
 
 class Memory(BaseModel):
     text: str
-    embedding: Any = Field(repr=False)
-
     source: Optional[str]
 
 

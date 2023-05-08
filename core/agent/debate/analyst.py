@@ -11,7 +11,7 @@ from ..base import BaseAgent
 
 
 class AnalystAgent(BaseAgent, AgentInterface):
-    def _get_initial_prompt_text(self, beliefs: str, common_sense: str):
+    def _get_initial_prompt_text(self, beliefs: str):
         return f"""     
         You are pretending to be an analyst named {self.name} who has a strong belief about a topic.
 
@@ -20,10 +20,6 @@ class AnalystAgent(BaseAgent, AgentInterface):
         {beliefs}
            
         Your job is to seek relevant information to support your belief and field answers to further question.
-
-        Here is some common sense information that you should always keep in mind:
-
-        {common_sense}
 
         The next message will be the lastest few statements from a debate, including your own.
 
@@ -36,7 +32,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
         Be as nuanced and thoughtful as possible.
         """
 
-    def _get_question_prompt_text(self, beliefs: str, common_sense: str):
+    def _get_question_prompt_text(self, beliefs: str):
         return f"""     
         You are pretending to be an analyst named {self.name} who has a strong belief about a topic.
 
@@ -45,10 +41,6 @@ class AnalystAgent(BaseAgent, AgentInterface):
         {beliefs}
            
         Your job is to seek relevant information to support your belief and field answers to further question.
-
-        Here is some common sense information that you should always keep in mind:
-
-        {common_sense}
 
         The next message will be the lastest few statements from a debate, including your own.
 
@@ -61,7 +53,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
         Please respond only with the questions you wish to ask.
         """
 
-    def _get_reflection_prompt(self, beliefs: str, common_sense: str):
+    def _get_reflection_prompt(self, beliefs: str):
         return f"""     
         You are pretending to be an analyst named {self.name} who has a strong belief about a topic.
 
@@ -70,10 +62,6 @@ class AnalystAgent(BaseAgent, AgentInterface):
         {beliefs}
            
         Your job is to seek relevant information to support your belief and field answers to further question.
-
-        Here is some common sense information that you should always keep in mind:
-
-        {common_sense}
 
         Do not use any information from outside of your analysis.
 
@@ -130,14 +118,9 @@ class AnalystAgent(BaseAgent, AgentInterface):
             include_sources=["Strongly held beliefs"],
         )
 
-        common_sense = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
-            include_sources=["Common sense"],
-        )
-
         relevant_memories = await self.memory_store.recall_recent(
             n_memories=self.n_memories_per_prompt,
-            exclude_sources=["Strongly held beliefs", "Common sense"],
+            exclude_sources=["Strongly held beliefs"],
         )
 
         messages = [
@@ -145,7 +128,6 @@ class AnalystAgent(BaseAgent, AgentInterface):
                 role="system",
                 content=self._get_question_prompt_text(
                     self.memory_store.memories_as_list(beliefs),
-                    self.memory_store.memories_as_list(common_sense),
                 ),
             ),
             *[
@@ -172,9 +154,6 @@ class AnalystAgent(BaseAgent, AgentInterface):
 
         return Prompt(messages=messages)
 
-    async def conduct_research(self, input, conversation):
-        await self.use_tools(input, conversation)
-
     async def _build_information_assimilation_prompt(
         self,
         input: str,
@@ -189,7 +168,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
 
         relevant_memories = await self.memory_store.recall_recent(
             n_memories=self.n_memories_per_prompt,
-            exclude_sources=["Strongly held beliefs", "Common sense"],
+            exclude_sources=["Strongly held beliefs"],
         )
 
         messages = [
@@ -237,14 +216,9 @@ class AnalystAgent(BaseAgent, AgentInterface):
             include_sources=["Strongly held beliefs"],
         )
 
-        common_sense = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
-            include_sources=["Common sense"],
-        )
-
         relevant_memories = await self.memory_store.recall_recent(
             n_memories=self.n_memories_per_prompt,
-            exclude_sources=["Strongly held beliefs", "Common sense"],
+            exclude_sources=["Strongly held beliefs"],
         )
 
         messages = [
@@ -252,7 +226,6 @@ class AnalystAgent(BaseAgent, AgentInterface):
                 role="system",
                 content=self._get_initial_prompt_text(
                     self.memory_store.memories_as_list(beliefs),
-                    self.memory_store.memories_as_list(common_sense),
                 ),
             ),
             *[
@@ -297,7 +270,6 @@ class AnalystAgent(BaseAgent, AgentInterface):
                 role="system",
                 content=self._get_reflection_prompt(
                     self.memory_store.memories_as_list(beliefs),
-                    self.memory_store.memories_as_list(common_sense),
                 ),
             ),
             *[

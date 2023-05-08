@@ -1,13 +1,10 @@
 from typing import Optional
 
-from lib.vector.search import VectorSearch, VectorSearchType
 from core.embeddings.interfaces import EmbeddingInterface
-
 from core.embeddings.sbert import SentenceBertEmbedding
-from .interfaces import (
-    MemoryStoreInterface,
-    Memory,
-)
+from lib.vector.search import VectorSearch, VectorSearchType
+
+from .interfaces import Memory, MemoryStoreInterface
 
 
 class LocalMemoryStore(MemoryStoreInterface):

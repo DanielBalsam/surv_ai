@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from random import Random
 from typing import Optional
-from core.teams.interfaces import TeamResult
 
-from lib.language.interfaces import LargeLanguageModelClientInterface
+from core.teams.interfaces import TeamResult
 from core.tools.interfaces import ToolbeltInterface
+from lib.language.interfaces import LargeLanguageModelClientInterface
 
 
 class BaseTeam(ABC):
@@ -30,8 +30,5 @@ class BaseTeam(ABC):
         self._random.seed(random_state)
 
     @abstractmethod
-    async def _converse(self, input: str) -> TeamResult:
-        ...
-
     async def prompt(self, input: str) -> TeamResult:
-        return await self._converse(input)
+        ...

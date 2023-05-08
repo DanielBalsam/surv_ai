@@ -1,10 +1,7 @@
-from lib.language.interfaces import (
-    Prompt,
-    PromptMessage,
-)
+from lib.language.interfaces import Prompt, PromptMessage
 
-from .interfaces import AgentInterface
 from .base import BaseAgent
+from .interfaces import AgentInterface
 
 
 class BinaryAgent(BaseAgent, AgentInterface):

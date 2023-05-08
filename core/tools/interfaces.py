@@ -1,5 +1,5 @@
-from typing import Protocol
 from re import Pattern
+from typing import Protocol
 
 from lib.language.interfaces import LargeLanguageModelClientInterface
 

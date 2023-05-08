@@ -1,6 +1,7 @@
-import numpy as np
 from enum import StrEnum
+
 import faiss
+import numpy as np
 
 
 class VectorSearchType(StrEnum):

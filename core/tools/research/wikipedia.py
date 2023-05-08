@@ -1,20 +1,20 @@
-from typing import Optional
-from bs4 import BeautifulSoup
-import re
 import asyncio
+import re
+from typing import Optional
 
 from aiohttp import ClientSession
-from lib.vector.search import VectorSearch, VectorSearchType
+from bs4 import BeautifulSoup
+
 from core.embeddings.interfaces import EmbeddingInterface
 from core.embeddings.sbert import SentenceBertEmbedding
 from core.memory_store.interfaces import Memory
-
+from lib.agent_log import agent_log
 from lib.language.interfaces import (
     LargeLanguageModelClientInterface,
     Prompt,
     PromptMessage,
 )
-from lib.agent_log import agent_log
+from lib.vector.search import VectorSearch, VectorSearchType
 
 from .interfaces import QueryToolInterface
 
@@ -164,11 +164,9 @@ class WikipediaTool(QueryToolInterface):
             f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
         )
 
-        page_embeddings = self.embeddings.embed([page_summary])[0]
         return Memory(
             text=f"Wikipedia page entitled {page_title}: {page_summary}",
             source=source,
-            embedding=page_embeddings,
         )
 
     async def _filter_relevant_pages(

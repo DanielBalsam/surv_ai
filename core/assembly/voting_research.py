@@ -1,12 +1,16 @@
-from thefuzz import process, fuzz
 import asyncio
-from core.memory_store.interfaces import Memory
+import logging
+from random import sample
 
-from core.tools.interfaces import NoMemoriesFoundException, ToolbeltInterface
-from .interfaces import AssemblyInterface, AssemblyResponse
-from core.agent.research import ResearchAgent
+from thefuzz import fuzz, process
+
 from core.agent.binary import BinaryAgent
+from core.agent.research import ResearchAgent
 from core.conversation.conversation import Conversation
+from core.memory_store.interfaces import Memory
+from core.tools.interfaces import NoMemoriesFoundException, ToolbeltInterface
+
+from .interfaces import AssemblyInterface, AssemblyResponse
 
 
 class VotingResearcherAssembly(AssemblyInterface):
@@ -16,12 +20,14 @@ class VotingResearcherAssembly(AssemblyInterface):
         toolbelt: ToolbeltInterface,
         n_agents=10,
         max_concurrency=10,
+        max_articles_per_agent=5,
     ):
         self.client = client
         self.toolbelt = toolbelt
 
         self.n_agents = n_agents
         self.max_concurrency = max_concurrency
+        self.max_articles_per_agent = max_articles_per_agent
 
     async def _conduct_research(
         self,
@@ -33,11 +39,13 @@ class VotingResearcherAssembly(AssemblyInterface):
             research_agent = ResearchAgent(
                 self.client,
                 toolbelt=self.toolbelt,
-                n_memories_per_prompt=20,
+                n_memories_per_prompt=self.max_articles_per_agent,
                 _hyperparameters={"temperature": 0.4},
             )
 
-            for article in relevant_articles:
+            for article in sample(
+                relevant_articles, self.max_articles_per_agent
+            ):
                 await research_agent.memory_store.add_memory(article)
 
             response_conversation = Conversation()
@@ -56,15 +64,19 @@ class VotingResearcherAssembly(AssemblyInterface):
             decision = await binary_agent.prompt(prompt, response_conversation)
             summaries.add(decision, "Decision", binary_agent._color)
 
-            options = ["true", "false", "undecided"]
-            coerced_decision = process.extractOne(
-                decision, options, scorer=fuzz.partial_ratio
-            )[0]
+            true_in_decision = "true" in decision.lower()
+            false_in_decision = "false" in decision.lower()
 
-            return coerced_decision
+            if true_in_decision and not false_in_decision:
+                return "true"
+            elif false_in_decision and not true_in_decision:
+                return "false"
+            else:
+                return "undecided"
         except NoMemoriesFoundException:
             return "undecided"
-        except Exception:
+        except Exception as e:
+            logging.error(e)
             return "error"
 
     async def prompt(self, prompt: str):
@@ -100,7 +112,7 @@ class VotingResearcherAssembly(AssemblyInterface):
         percent_in_favor = results["true"] / (
             results["true"] + results["false"]
         )
-        error_bars = results["undecided"] / (
+        uncertainty = results["undecided"] / (
             results["true"] + results["false"]
         )
 
@@ -110,6 +122,6 @@ class VotingResearcherAssembly(AssemblyInterface):
             undecided=results["undecided"],
             error=results["error"],
             percent_in_favor=percent_in_favor,
-            error_bar=error_bars,
+            uncertainty=uncertainty,
             summaries=[],
         )
