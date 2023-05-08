@@ -1,6 +1,5 @@
 import re
 
-from core.conversation.interfaces import ConversationInterface
 from lib.agent_log import agent_log
 from lib.language.interfaces import (
     LargeLanguageModelClientInterface,
@@ -21,9 +20,6 @@ class Toolbelt(ToolbeltInterface):
         client: LargeLanguageModelClientInterface,
         tools: list[ToolInterface],
     ):
-        # if tools:
-        #     tools.append(NoopTool(client))
-
         self.client = client
         self.tools = tools
 
@@ -35,9 +31,7 @@ class Toolbelt(ToolbeltInterface):
             else ""
         )
 
-    def _get_toolbelt_prompt(
-        self, original_prompt: str, conversation: str
-    ) -> str:
+    def _get_toolbelt_prompt(self, original_prompt: str) -> str:
         return Prompt(
             messages=[
                 PromptMessage(
@@ -59,13 +53,8 @@ class Toolbelt(ToolbeltInterface):
                 ),
                 PromptMessage(
                     role="assistant",
-                    content=f"""This is what the user has been talking about:
-                    
-                    ```
-                    {conversation}
-                    ```
-                    
-                    With that in mind, I will execute the following command:
+                    content=f"""
+                    In order to research the user's prompt, I will execute the following command:
                     """,
                 ),
             ]
@@ -74,12 +63,9 @@ class Toolbelt(ToolbeltInterface):
     async def inspect(
         self,
         original_prompt: str,
-        conversation: ConversationInterface,
         attempt=1,
     ):
-        prompt = self._get_toolbelt_prompt(
-            original_prompt, conversation.as_string()
-        )
+        prompt = self._get_toolbelt_prompt(original_prompt)
 
         response = (
             await self.client.get_completions([prompt], **{"temperature": 0.7})
@@ -89,25 +75,21 @@ class Toolbelt(ToolbeltInterface):
             match = re.match(tool.command, response)
 
             if match:
-                memories = []
+                knowledge = []
                 for args in match.groups():
-                    relevant_context = conversation.as_string()
-
-                    agent_log.thought(
-                        f"...Agent is using tool {tool.__class__.__name__} with args {args}..."
+                    agent_log.log_context(
+                        f"...Using tool {tool.__class__.__name__} with args {args}..."
                     )
 
-                    memories += await tool.use(
-                        original_prompt, relevant_context, args
-                    )
+                    knowledge += await tool.use(original_prompt, args)
 
-                    if not memories and attempt < 3:
-                        memories = await self.inspect(
-                            original_prompt, conversation, attempt=attempt + 1
+                    if not knowledge and attempt < 3:
+                        knowledge = await self.inspect(
+                            original_prompt, attempt=attempt + 1
                         )
-                    elif not memories:
+                    elif not knowledge:
                         raise NoMemoriesFoundException()
 
-                return memories
+                return knowledge
 
         return []

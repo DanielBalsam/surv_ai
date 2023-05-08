@@ -1,14 +1,12 @@
 from abc import ABC, abstractmethod
-from random import Random, choice
+from random import choice
 from typing import Optional
 
 from colorama import Fore
 
 from core.conversation.interfaces import ConversationInterface
-from core.memory_store.interfaces import MemoryStoreInterface
-from core.memory_store.local import LocalMemoryStore
-from core.tools.interfaces import ToolbeltInterface
-from core.tools.toolbelt import Toolbelt
+from core.knowledge_store.interfaces import Knowledge, KnowledgeStoreInterface
+from core.knowledge_store.local import LocalKnowledgeStore
 from lib.agent_log import agent_log
 from lib.language.interfaces import LargeLanguageModelClientInterface, Prompt
 
@@ -17,32 +15,26 @@ class BaseAgent(ABC):
     def __init__(
         self,
         client: LargeLanguageModelClientInterface,
-        memory_store: Optional[MemoryStoreInterface] = None,
-        toolbelt: Optional[list[ToolbeltInterface]] = None,
-        random_state: int = 42,
-        n_memories_per_prompt: int = 5,
-        _hyperparameters: Optional[dict] = None,
+        knowledge_store: Optional[KnowledgeStoreInterface] = None,
+        n_knowledge_items_per_prompt: int = 5,
         name: Optional[str] = None,
+        _hyperparameters: Optional[dict] = None,
     ):
-        if memory_store is None:
-            memory_store = LocalMemoryStore()
-
-        if not toolbelt:
-            toolbelt = Toolbelt(client, [])
+        if knowledge_store is None:
+            knowledge_store = LocalKnowledgeStore()
 
         if not name:
             name = self.__class__.__name__
 
         self.client = client
-        self.memory_store = memory_store
-        self.toolbelt = toolbelt
+        self.knowledge_store = knowledge_store
 
-        self.n_memories_per_prompt = n_memories_per_prompt
+        self.n_knowledge_items_per_prompt = n_knowledge_items_per_prompt
 
         self._hyperparameters = _hyperparameters or {}
         self.name = name
 
-        self._color = choice(
+        self.color = choice(
             [
                 Fore.BLUE,
                 Fore.CYAN,
@@ -53,9 +45,6 @@ class BaseAgent(ABC):
                 Fore.LIGHTGREEN_EX,
             ]
         )
-
-        self._random = Random()
-        self._random.seed(random_state)
 
     @abstractmethod
     async def _build_completion_prompt(
@@ -76,13 +65,8 @@ class BaseAgent(ABC):
 
         return response
 
-    async def teach(self, input: str, source: Optional[str] = "User"):
-        await self.memory_store.add_text(f"{source}: {input}", source=source)
+    def teach_text(self, input: str, source: Optional[str] = "User"):
+        self.knowledge_store.add_text(f"{source}: {input}", source=source)
 
-    async def transfer_memories(self, agent: "BaseAgent"):
-        agent_log.thought(
-            f"Transferring memories from {agent.name} to {self.name}"
-        )
-
-        for memory in agent.memory_store.memories:
-            await self.memory_store.add_memory(memory)
+    def teach_knowledge(self, knowledge: Knowledge):
+        self.knowledge_store.add_knowledge(knowledge)

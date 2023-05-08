@@ -1,7 +1,6 @@
 from typing import Optional
 
 from core.conversation.interfaces import ConversationInterface
-from lib.agent_log import agent_log
 from lib.language.interfaces import Prompt, PromptMessage
 
 from .base import BaseAgent
@@ -9,7 +8,7 @@ from .interfaces import AgentInterface
 
 
 class ResearchAgent(BaseAgent, AgentInterface):
-    def _get_initial_prompt_text(self, input: str, relevant_memories: str):
+    def _get_initial_prompt_text(self, input: str, relevant_knowledge: str):
         return f"""     
         You are a researcher named who is concerned with determining the truth of the following statement:
 
@@ -31,8 +30,8 @@ class ResearchAgent(BaseAgent, AgentInterface):
         input: str,
         conversation: Optional[ConversationInterface] = None,
     ) -> Prompt:
-        relevant_memories = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        relevant_knowledge = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
         )
 
         messages = [
@@ -40,16 +39,18 @@ class ResearchAgent(BaseAgent, AgentInterface):
                 role="system",
                 content=self._get_initial_prompt_text(
                     input,
-                    self.memory_store.memories_as_list(relevant_memories),
+                    self.knowledge_store.knowledge_as_string(
+                        relevant_knowledge
+                    ),
                 ),
             ),
             *[
                 PromptMessage(
-                    content=memory.text,
+                    content=knowledge.text,
                     role="user",
-                    name=memory.source,
+                    name=knowledge.source,
                 )
-                for memory in relevant_memories
+                for knowledge in relevant_knowledge
             ],
             PromptMessage(
                 role="assistant",

@@ -5,7 +5,7 @@ import re
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
-from core.memory_store.interfaces import Memory
+from core.knowledge_store.interfaces import Knowledge
 from lib.agent_log import agent_log
 from lib.language.interfaces import (
     LargeLanguageModelClientInterface,
@@ -158,7 +158,6 @@ class NewsMediaTool(QueryToolInterface):
         self,
         session: ClientSession,
         original_prompt: str,
-        relevant_context: str,
         result: dict,
     ):
         metatags = result["pagemap"]["metatags"][0]
@@ -166,7 +165,7 @@ class NewsMediaTool(QueryToolInterface):
         publication = metatags.get("og:site_name", result["displayLink"])
         title = metatags.get("og:title", result["title"])
 
-        agent_log.thought(
+        agent_log.log_context(
             f"......Retrieving {publication} article with title {title}......"
         )
         page_summary = await self._ingest_page_information(
@@ -177,7 +176,7 @@ class NewsMediaTool(QueryToolInterface):
             result["link"],
         )
 
-        return Memory(
+        return Knowledge(
             text=f'{publication} article entitled "{title}": {page_summary}',
             source=result["link"],
         )
@@ -185,9 +184,8 @@ class NewsMediaTool(QueryToolInterface):
     async def use(
         self,
         original_prompt: str,
-        relevant_context: str,
         search_query: str,
-    ) -> list[Memory]:
+    ) -> list[Knowledge]:
         async with ClientSession() as session:
             search_results = await self._search(session, search_query)
 
@@ -196,9 +194,7 @@ class NewsMediaTool(QueryToolInterface):
 
             return await asyncio.gather(
                 *[
-                    self._ingest_pages(
-                        session, original_prompt, relevant_context, web_url
-                    )
+                    self._ingest_pages(session, original_prompt, web_url)
                     for web_url in search_results[: self.n_articles]
                 ]
             )

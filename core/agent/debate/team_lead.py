@@ -159,7 +159,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
         self,
         input: str,
         rubric: str,
-        relevant_memories: str,
+        relevant_knowledge: str,
         conversation=None,
     ):
         return Prompt(
@@ -186,7 +186,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
 
                     Here is what I know to be true:
 
-                    {relevant_memories}
+                    {relevant_knowledge}
                     
                     Given this rubric and what I know to be true, here is how I think Hank and Sabrina have done:
                     """,
@@ -197,8 +197,8 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
     async def _build_completion_prompt(
         self, input: str, conversation=None
     ) -> str:
-        relevant_memories = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        relevant_knowledge = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
         )
 
         rubric_prompt = self._get_rubric_prompt(
@@ -209,17 +209,17 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
                 [rubric_prompt], **self._hyperparameters
             )
         )[0]
-        agent_log.thought(f"{self.name} thinks: {rubric}")
+        agent_log.log_internal(f"{self.name} thinks: {rubric}")
 
         grading_prompt = self._get_grading_prompt(
-            input, rubric, relevant_memories, conversation=conversation
+            input, rubric, relevant_knowledge, conversation=conversation
         )
         grades = (
             await self.client.get_completions(
                 [grading_prompt], **self._hyperparameters
             )
         )[0]
-        agent_log.thought(f"{self.name} thinks: {grades}")
+        agent_log.log_internal(f"{self.name} thinks: {grades}")
 
         messages = [
             PromptMessage(
@@ -244,7 +244,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
 
                 Here is what I know to be true:
 
-                {relevant_memories}
+                {relevant_knowledge}
 
                 Given my rubric and what I know to be true, I have assigned these scores:
 

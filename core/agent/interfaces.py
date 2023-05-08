@@ -1,6 +1,6 @@
 from typing import Optional, Protocol
 
-from core.memory_store.interfaces import MemoryStoreInterface
+from core.knowledge_store.interfaces import Knowledge, KnowledgeStoreInterface
 from core.tools.interfaces import ToolbeltInterface
 from lib.language.interfaces import LargeLanguageModelClientInterface
 
@@ -9,7 +9,7 @@ class AgentInterface(Protocol):
     def __init__(
         self,
         client: LargeLanguageModelClientInterface,
-        memory_store: Optional[MemoryStoreInterface],
+        knowledge_store: Optional[KnowledgeStoreInterface],
         toolbelt: Optional[list[ToolbeltInterface]],
     ):
         ...
@@ -17,5 +17,8 @@ class AgentInterface(Protocol):
     async def prompt(self, input: str) -> str:
         ...
 
-    async def teach(self, input: str):
+    def teach_text(self, input: str, source: Optional[str] = "User"):
+        ...
+
+    def teach_knowledge(self, knowledge: Knowledge):
         ...

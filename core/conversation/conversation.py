@@ -10,7 +10,7 @@ class Conversation(ConversationInterface):
         self.history: list[ChatMessage] = []
 
     def add(self, message: str, speaker: str, color=Optional[str]):
-        agent_log.speech(f"{speaker}: {message}", color)
+        agent_log.log_output(f"{speaker}: {message}", color)
         self.history.append(
             ChatMessage(text=message, speaker=speaker, color=color)
         )

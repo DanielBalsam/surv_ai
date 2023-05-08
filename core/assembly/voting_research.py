@@ -2,12 +2,10 @@ import asyncio
 import logging
 from random import sample
 
-from thefuzz import fuzz, process
-
 from core.agent.binary import BinaryAgent
 from core.agent.research import ResearchAgent
 from core.conversation.conversation import Conversation
-from core.memory_store.interfaces import Memory
+from core.knowledge_store.interfaces import Knowledge
 from core.tools.interfaces import NoMemoriesFoundException, ToolbeltInterface
 
 from .interfaces import AssemblyInterface, AssemblyResponse
@@ -33,20 +31,20 @@ class VotingResearcherAssembly(AssemblyInterface):
         self,
         prompt: str,
         summaries: Conversation,
-        relevant_articles: list[Memory],
+        relevant_articles: list[Knowledge],
     ):
         try:
             research_agent = ResearchAgent(
                 self.client,
                 toolbelt=self.toolbelt,
-                n_memories_per_prompt=self.max_articles_per_agent,
+                n_knowledge_items_per_prompt=self.max_articles_per_agent,
                 _hyperparameters={"temperature": 0.4},
             )
 
             for article in sample(
                 relevant_articles, self.max_articles_per_agent
             ):
-                await research_agent.memory_store.add_memory(article)
+                research_agent.teach_knowledge(article)
 
             response_conversation = Conversation()
             response = await research_agent.prompt(
@@ -54,7 +52,7 @@ class VotingResearcherAssembly(AssemblyInterface):
             )
 
             response_conversation.add(
-                response, "Researcher", research_agent._color
+                response, "Researcher", research_agent.color
             )
 
             binary_agent = BinaryAgent(
@@ -62,7 +60,7 @@ class VotingResearcherAssembly(AssemblyInterface):
             )
 
             decision = await binary_agent.prompt(prompt, response_conversation)
-            summaries.add(decision, "Decision", binary_agent._color)
+            summaries.add(decision, "Decision", binary_agent.color)
 
             true_in_decision = "true" in decision.lower()
             false_in_decision = "false" in decision.lower()
@@ -123,5 +121,5 @@ class VotingResearcherAssembly(AssemblyInterface):
             error=results["error"],
             percent_in_favor=percent_in_favor,
             uncertainty=uncertainty,
-            summaries=[],
+            summaries=[[summary.text] for summary in summaries],
         )

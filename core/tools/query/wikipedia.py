@@ -1,20 +1,16 @@
 import asyncio
 import re
-from typing import Optional
 
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
-from core.embeddings.interfaces import EmbeddingInterface
-from core.embeddings.sbert import SentenceBertEmbedding
-from core.memory_store.interfaces import Memory
+from core.knowledge_store.interfaces import Knowledge
 from lib.agent_log import agent_log
 from lib.language.interfaces import (
     LargeLanguageModelClientInterface,
     Prompt,
     PromptMessage,
 )
-from lib.vector.search import VectorSearch, VectorSearchType
 
 from .interfaces import QueryToolInterface
 
@@ -30,15 +26,10 @@ class WikipediaTool(QueryToolInterface):
     def __init__(
         self,
         client: LargeLanguageModelClientInterface,
-        embeddings: Optional[EmbeddingInterface] = None,
-        n_pages=1,
+        n_articles=1,
     ):
-        if not embeddings:
-            embeddings = SentenceBertEmbedding()
-
         self.client = client
-        self.n_pages = n_pages
-        self.embeddings = embeddings
+        self.n_articles = n_articles
 
         self._already_searched = dict()
 
@@ -128,30 +119,13 @@ class WikipediaTool(QueryToolInterface):
 
         return response[0]
 
-    def get_most_relevant_information_from_page(
-        self,
-        query: str,
-        relevant_context: str,
-        paragraphs: list[str],
-        n_results=10,
-    ):
-        prompt_embedding = self.embeddings.embed([query + relevant_context])[0]
-        paragraph_embeddings = self.embeddings.embed(paragraphs)
-        _, indices = VectorSearch.sort_by_similarity(
-            paragraph_embeddings,
-            prompt_embedding,
-            type=VectorSearchType.L2,
-        )
-
-        return [paragraphs[i] for i in indices[0:n_results]]
-
     async def _ingest_pages(
         self,
         session: ClientSession,
         original_prompt: str,
         page_title: str,
     ):
-        agent_log.thought(
+        agent_log.log_context(
             f"......Learning Wikipedia page with title {page_title}......"
         )
         page_summary = await self._ingest_page_information(
@@ -164,7 +138,7 @@ class WikipediaTool(QueryToolInterface):
             f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
         )
 
-        return Memory(
+        return Knowledge(
             text=f"Wikipedia page entitled {page_title}: {page_summary}",
             source=source,
         )
@@ -172,7 +146,6 @@ class WikipediaTool(QueryToolInterface):
     async def _filter_relevant_pages(
         self,
         original_prompt: str,
-        relevant_context: str,
         search_results: list[str],
     ):
         prompt = Prompt(
@@ -183,10 +156,6 @@ class WikipediaTool(QueryToolInterface):
                     Original prompt:
                     
                     '{original_prompt}'.
-                    
-                    Relevant context:
-
-                    {relevant_context}
 
                     The next message will be the the list of articles separated by commas.
 
@@ -207,15 +176,14 @@ class WikipediaTool(QueryToolInterface):
     async def use(
         self,
         original_prompt: str,
-        relevant_context: str,
         search_query: str,
-    ) -> list[Memory]:
+    ) -> list[Knowledge]:
         async with ClientSession() as session:
             search_results = await self._search(session, search_query)
 
             relevant_results = (
                 await self._filter_relevant_pages(
-                    original_prompt, relevant_context, search_results
+                    original_prompt, search_results
                 )
             ).split(", ")
 
@@ -225,6 +193,6 @@ class WikipediaTool(QueryToolInterface):
             return await asyncio.gather(
                 *[
                     self._ingest_pages(session, original_prompt, page_title)
-                    for page_title in relevant_results[: self.n_pages]
+                    for page_title in relevant_results[: self.n_articles]
                 ]
             )

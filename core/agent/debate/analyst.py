@@ -113,13 +113,13 @@ class AnalystAgent(BaseAgent, AgentInterface):
         input: str,
         conversation: Optional[ConversationInterface] = None,
     ) -> Prompt:
-        beliefs = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        beliefs = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
             include_sources=["Strongly held beliefs"],
         )
 
-        relevant_memories = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        relevant_knowledge = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
             exclude_sources=["Strongly held beliefs"],
         )
 
@@ -127,7 +127,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
             PromptMessage(
                 role="system",
                 content=self._get_question_prompt_text(
-                    self.memory_store.memories_as_list(beliefs),
+                    self.knowledge_store.knowledge_as_string(beliefs),
                 ),
             ),
             *[
@@ -145,7 +145,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
                 content=f"""
                 Here is what I've learned from my research already:
 
-                {self.memory_store.memories_as_list(relevant_memories)}
+                {self.knowledge_store.knowledge_as_string(relevant_knowledge)}
 
                 Thinking about this, a question I'd want to answer to strengthen my argument would be:
                 """,
@@ -159,15 +159,13 @@ class AnalystAgent(BaseAgent, AgentInterface):
         input: str,
         conversation: Optional[ConversationInterface] = None,
     ) -> Prompt:
-        await self.conduct_research(input, conversation)
-
-        beliefs = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        beliefs = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
             include_sources=["Strongly held beliefs"],
         )
 
-        relevant_memories = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        relevant_knowledge = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
             exclude_sources=["Strongly held beliefs"],
         )
 
@@ -175,8 +173,10 @@ class AnalystAgent(BaseAgent, AgentInterface):
             PromptMessage(
                 role="system",
                 content=self._get_information_assimilation_prompt(
-                    self.memory_store.memories_as_list(beliefs),
-                    self.memory_store.memories_as_list(relevant_memories),
+                    self.knowledge_store.knowledge_as_string(beliefs),
+                    self.knowledge_store.knowledge_as_string(
+                        relevant_knowledge
+                    ),
                     conversation[-1].text,
                 ),
             ),
@@ -209,15 +209,15 @@ class AnalystAgent(BaseAgent, AgentInterface):
             )
         )[0]
 
-        agent_log.thought(f"{self.name} thinks: {argument_plan}")
+        agent_log.log_internal(f"{self.name} thinks: {argument_plan}")
 
-        beliefs = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        beliefs = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
             include_sources=["Strongly held beliefs"],
         )
 
-        relevant_memories = await self.memory_store.recall_recent(
-            n_memories=self.n_memories_per_prompt,
+        relevant_knowledge = self.knowledge_store.recall_recent(
+            n_knowledge_items=self.n_knowledge_items_per_prompt,
             exclude_sources=["Strongly held beliefs"],
         )
 
@@ -225,7 +225,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
             PromptMessage(
                 role="system",
                 content=self._get_initial_prompt_text(
-                    self.memory_store.memories_as_list(beliefs),
+                    self.knowledge_store.knowledge_as_string(beliefs),
                 ),
             ),
             *[
@@ -250,7 +250,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
 
                 And here are my notes from my research:
 
-                {relevant_memories}
+                {relevant_knowledge}
 
                 I will now execute my plan while filling in details, and respond with:
                 """,
@@ -263,13 +263,15 @@ class AnalystAgent(BaseAgent, AgentInterface):
             )
         )[0]
 
-        agent_log.thought(f"{self.name} thinks about saying: {first_attempt}")
+        agent_log.log_internal(
+            f"{self.name} thinks about saying: {first_attempt}"
+        )
 
         final_messages = [
             PromptMessage(
                 role="system",
                 content=self._get_reflection_prompt(
-                    self.memory_store.memories_as_list(beliefs),
+                    self.knowledge_store.knowledge_as_string(beliefs),
                 ),
             ),
             *[
@@ -294,7 +296,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
 
                 And here are my notes from my research:
 
-                {relevant_memories}
+                {relevant_knowledge}
 
                 And here is my first draft of my response:
 
