@@ -1,6 +1,6 @@
 from typing import Optional
 
-from lib.agent_log import agent_log
+from lib.log import logger
 
 from .interfaces import ChatMessage, ConversationInterface
 
@@ -10,7 +10,7 @@ class Conversation(ConversationInterface):
         self.history: list[ChatMessage] = []
 
     def add(self, message: str, speaker: str, color=Optional[str]):
-        agent_log.log_output(f"{speaker}: {message}", color)
+        logger.log_output(f"{speaker}: {message}", color)
         self.history.append(
             ChatMessage(text=message, speaker=speaker, color=color)
         )

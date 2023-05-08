@@ -5,8 +5,8 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
 from core.knowledge_store.interfaces import Knowledge
-from lib.agent_log import agent_log
-from lib.language.interfaces import (
+from lib.log import logger
+from lib.llm.interfaces import (
     LargeLanguageModelClientInterface,
     Prompt,
     PromptMessage,
@@ -125,7 +125,7 @@ class WikipediaTool(QueryToolInterface):
         original_prompt: str,
         page_title: str,
     ):
-        agent_log.log_context(
+        logger.log_context(
             f"......Learning Wikipedia page with title {page_title}......"
         )
         page_summary = await self._ingest_page_information(

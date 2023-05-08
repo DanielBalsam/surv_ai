@@ -1,7 +1,7 @@
 from re import Pattern
 from typing import Protocol
 
-from lib.language.interfaces import LargeLanguageModelClientInterface
+from lib.llm.interfaces import LargeLanguageModelClientInterface
 
 
 class NoMemoriesFoundException(Exception):

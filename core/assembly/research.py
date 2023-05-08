@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from random import sample
 
 from core.agent.binary import BinaryAgent
@@ -7,6 +6,8 @@ from core.agent.research import ResearchAgent
 from core.conversation.conversation import Conversation
 from core.knowledge_store.interfaces import Knowledge
 from core.tools.interfaces import NoMemoriesFoundException, ToolbeltInterface
+
+from lib.log import logger
 
 from .interfaces import AssemblyInterface, AssemblyResponse
 
@@ -73,7 +74,7 @@ class ResearchAssembly(AssemblyInterface):
         except NoMemoriesFoundException:
             return "undecided"
         except Exception as e:
-            logging.error(e)
+            logger.log_exception(e)
             return "error"
 
     async def prompt(self, prompt: str):

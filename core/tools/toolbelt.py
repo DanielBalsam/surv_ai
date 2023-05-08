@@ -1,7 +1,7 @@
 import re
 
-from lib.agent_log import agent_log
-from lib.language.interfaces import (
+from lib.log import logger
+from lib.llm.interfaces import (
     LargeLanguageModelClientInterface,
     Prompt,
     PromptMessage,
@@ -77,7 +77,7 @@ class Toolbelt(ToolbeltInterface):
             if match:
                 knowledge = []
                 for args in match.groups():
-                    agent_log.log_context(
+                    logger.log_context(
                         f"...Using tool {tool.__class__.__name__} with args {args}..."
                     )
 

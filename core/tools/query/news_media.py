@@ -6,8 +6,8 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
 from core.knowledge_store.interfaces import Knowledge
-from lib.agent_log import agent_log
-from lib.language.interfaces import (
+from lib.log import logger
+from lib.llm.interfaces import (
     LargeLanguageModelClientInterface,
     Prompt,
     PromptMessage,
@@ -165,7 +165,7 @@ class NewsMediaTool(QueryToolInterface):
         publication = metatags.get("og:site_name", result["displayLink"])
         title = metatags.get("og:title", result["title"])
 
-        agent_log.log_context(
+        logger.log_context(
             f"......Retrieving {publication} article with title {title}......"
         )
         page_summary = await self._ingest_page_information(

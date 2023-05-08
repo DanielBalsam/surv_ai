@@ -7,8 +7,8 @@ from colorama import Fore
 from core.conversation.interfaces import ConversationInterface
 from core.knowledge_store.interfaces import Knowledge, KnowledgeStoreInterface
 from core.knowledge_store.local import LocalKnowledgeStore
-from lib.agent_log import agent_log
-from lib.language.interfaces import LargeLanguageModelClientInterface, Prompt
+from lib.log import logger
+from lib.llm.interfaces import LargeLanguageModelClientInterface, Prompt
 
 
 class BaseAgent(ABC):

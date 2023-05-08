@@ -2,7 +2,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from lib.language.interfaces import LargeLanguageModelClientInterface
+from lib.llm.interfaces import LargeLanguageModelClientInterface
 
 
 class AssemblyResponse(BaseModel):

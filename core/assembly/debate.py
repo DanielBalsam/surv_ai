@@ -4,7 +4,7 @@ from random import sample
 from pydantic import BaseModel
 from core.conversation.conversation import Conversation
 from core.tools.interfaces import ToolbeltInterface
-from lib.language.interfaces import LargeLanguageModelClientInterface
+from lib.llm.interfaces import LargeLanguageModelClientInterface
 from .interfaces import AssemblyInterface, AssemblyResponse
 
 from core.agent.debate.analyst import AnalystAgent
@@ -12,7 +12,7 @@ from core.agent.debate.select_winner import SelectWinnerAgent
 from core.agent.debate.team_lead import TeamLeadAgent
 from core.agent.invertor import InvertorAgent
 from core.knowledge_store.interfaces import Knowledge
-from lib.agent_log import agent_log
+from lib.log import logger
 
 
 class _TeamResult(BaseModel):
@@ -119,7 +119,7 @@ class _DebateTeam:
         debate = Conversation()
         team_lead_thoughts = Conversation()
 
-        agent_log.log_context(
+        logger.log_context(
             f'Initiating a debate about whether "{assertion}" is true.'
         )
 
@@ -176,7 +176,7 @@ class _DebateTeam:
                         skeptic_agent,
                     )
 
-                    agent_log.log_context(f"Point awarded to {decision}")
+                    logger.log_context(f"Point awarded to {decision}")
 
                     if believer_agent.name in decision:
                         points_in_favor += 1

@@ -2,7 +2,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from lib.language.interfaces import PromptMessage
+from lib.llm.interfaces import PromptMessage
 
 
 class ChatMessage(BaseModel):

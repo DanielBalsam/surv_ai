@@ -1,7 +1,7 @@
 from typing import Optional
 from core.conversation.interfaces import ConversationInterface
-from lib.agent_log import agent_log
-from lib.language.interfaces import (
+from lib.log import logger
+from lib.llm.interfaces import (
     Prompt,
     PromptMessage,
 )
@@ -209,7 +209,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
             )
         )[0]
 
-        agent_log.log_internal(f"{self.name} thinks: {argument_plan}")
+        logger.log_internal(f"{self.name} thinks: {argument_plan}")
 
         beliefs = self.knowledge_store.recall_recent(
             n_knowledge_items=self.n_knowledge_items_per_prompt,
@@ -263,7 +263,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
             )
         )[0]
 
-        agent_log.log_internal(
+        logger.log_internal(
             f"{self.name} thinks about saying: {first_attempt}"
         )
 

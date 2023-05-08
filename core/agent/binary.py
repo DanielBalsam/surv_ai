@@ -1,4 +1,4 @@
-from lib.language.interfaces import Prompt, PromptMessage
+from lib.llm.interfaces import Prompt, PromptMessage
 
 from .base import BaseAgent
 from .interfaces import AgentInterface

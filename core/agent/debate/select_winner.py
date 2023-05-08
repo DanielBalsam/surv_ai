@@ -1,4 +1,4 @@
-from lib.language.interfaces import (
+from lib.llm.interfaces import (
     Prompt,
     PromptMessage,
 )

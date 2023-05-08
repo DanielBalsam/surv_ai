@@ -2,7 +2,7 @@ from typing import Optional, Protocol
 
 from core.knowledge_store.interfaces import Knowledge, KnowledgeStoreInterface
 from core.tools.interfaces import ToolbeltInterface
-from lib.language.interfaces import LargeLanguageModelClientInterface
+from lib.llm.interfaces import LargeLanguageModelClientInterface
 
 
 class AgentInterface(Protocol):

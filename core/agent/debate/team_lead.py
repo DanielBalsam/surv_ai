@@ -1,4 +1,4 @@
-from lib.language.interfaces import (
+from lib.llm.interfaces import (
     Prompt,
     PromptMessage,
 )
@@ -6,7 +6,7 @@ from lib.language.interfaces import (
 from ..interfaces import AgentInterface
 from ..base import BaseAgent
 
-from lib.agent_log import agent_log
+from lib.log import logger
 
 
 class TeamLeadAgent(BaseAgent, AgentInterface):
@@ -209,7 +209,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
                 [rubric_prompt], **self._hyperparameters
             )
         )[0]
-        agent_log.log_internal(f"{self.name} thinks: {rubric}")
+        logger.log_internal(f"{self.name} thinks: {rubric}")
 
         grading_prompt = self._get_grading_prompt(
             input, rubric, relevant_knowledge, conversation=conversation
@@ -219,7 +219,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
                 [grading_prompt], **self._hyperparameters
             )
         )[0]
-        agent_log.log_internal(f"{self.name} thinks: {grades}")
+        logger.log_internal(f"{self.name} thinks: {grades}")
 
         messages = [
             PromptMessage(

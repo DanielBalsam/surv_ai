@@ -2,7 +2,7 @@ from typing import Optional, Protocol
 
 from pydantic import BaseModel
 
-from lib.language.interfaces import LargeLanguageModelClientInterface
+from lib.llm.interfaces import LargeLanguageModelClientInterface
 
 
 class Knowledge(BaseModel):
