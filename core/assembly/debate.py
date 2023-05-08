@@ -7,8 +7,6 @@ from core.tools.interfaces import ToolbeltInterface
 from lib.language.interfaces import LargeLanguageModelClientInterface
 from .interfaces import AssemblyInterface, AssemblyResponse
 
-from thefuzz import fuzz, process
-
 from core.agent.debate.analyst import AnalystAgent
 from core.agent.debate.select_winner import SelectWinnerAgent
 from core.agent.debate.team_lead import TeamLeadAgent
@@ -52,16 +50,15 @@ class _DebateTeam:
 
         decision = await select_winner.prompt(summary)
 
-        options = [
-            f"{believer_agent.name}",
-            f"{skeptic_agent.name}",
-            "Undecided",
-        ]
-        coerced_decision = process.extractOne(
-            decision, options, scorer=fuzz.partial_ratio
-        )[0]
+        believer_agent_in_decision = believer_agent.name in decision
+        skeptic_agent_in_decision = skeptic_agent.name in decision
 
-        return coerced_decision
+        if believer_agent_in_decision and not skeptic_agent_in_decision:
+            return believer_agent.name
+        elif skeptic_agent_in_decision and not believer_agent_in_decision:
+            return skeptic_agent.name
+
+        return "Undecided"
 
     async def _init_agents(
         self, assertion: str, inverted_assertion: str, debate: Conversation
