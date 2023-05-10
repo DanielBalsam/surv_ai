@@ -84,7 +84,18 @@ class ResearchAssembly(AssemblyInterface):
         summaries = Conversation()
         agents = 0
 
-        relevant_articles = await self.toolbelt.inspect(prompt)
+        try:
+            relevant_articles = await self.toolbelt.inspect(prompt)
+        except NoMemoriesFoundException:
+            return AssemblyResponse(
+                in_favor=0,
+                against=0,
+                undecided=0,
+                error=self.n_agents,
+                percent_in_favor=0,
+                uncertainty=0,
+                summaries=[],
+            )
 
         while agents < self.n_agents:
             coroutines = []
