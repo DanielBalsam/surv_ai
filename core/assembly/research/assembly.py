@@ -1,15 +1,15 @@
 import asyncio
 from random import sample
 
-from core.agent.binary import BinaryAgent
-from core.agent.research import ResearchAgent
+from .agents.binary import BinaryAgent
+from .agents.research import ResearchAgent
 from core.conversation.conversation import Conversation
 from core.knowledge_store.interfaces import Knowledge
 from core.tools.interfaces import NoMemoriesFoundException, ToolbeltInterface
 
 from lib.log import logger
 
-from .interfaces import AssemblyInterface, AssemblyResponse
+from ..interfaces import AssemblyInterface, AssemblyResponse
 
 
 class ResearchAssembly(AssemblyInterface):
@@ -42,24 +42,25 @@ class ResearchAssembly(AssemblyInterface):
             )
 
             for article in sample(
-                relevant_articles, self.max_articles_per_agent
+                relevant_articles,
+                min(len(relevant_articles), self.max_articles_per_agent),
             ):
                 research_agent.teach_knowledge(article)
 
-            response_conversation = Conversation()
-            response = await research_agent.prompt(
-                prompt, response_conversation
-            )
+            response = await research_agent.complete(prompt)
 
+            binary_agent = BinaryAgent(
+                self.client,
+                _hyperparameters={"temperature": 0.2, "max_tokens": 5},
+            )
+            binary_agent.teach_text(prompt, "Assertion")
+
+            response_conversation = Conversation()
             response_conversation.add(
                 response, "Researcher", research_agent.color
             )
 
-            binary_agent = BinaryAgent(
-                self.client, _hyperparameters={"temperature": 0}
-            )
-
-            decision = await binary_agent.prompt(prompt, response_conversation)
+            decision = await binary_agent.complete(response_conversation)
             summaries.add(decision, "Decision", binary_agent.color)
 
             true_in_decision = "true" in decision.lower()
@@ -77,13 +78,13 @@ class ResearchAssembly(AssemblyInterface):
             logger.log_exception(e)
             return "error"
 
-    async def prompt(self, prompt: str):
+    async def run(self, prompt: str):
         results = {"true": 0, "false": 0, "undecided": 0, "error": 0}
 
         summaries = Conversation()
         agents = 0
 
-        relevant_articles = await self.toolbelt.inspect(prompt, Conversation())
+        relevant_articles = await self.toolbelt.inspect(prompt)
 
         while agents < self.n_agents:
             coroutines = []
@@ -107,12 +108,16 @@ class ResearchAssembly(AssemblyInterface):
             for decision in decisions:
                 results[decision] += 1
 
-        percent_in_favor = results["true"] / (
-            results["true"] + results["false"]
-        )
-        uncertainty = results["undecided"] / (
-            results["true"] + results["false"]
-        )
+        if results["true"] + results["false"] == 0:
+            percent_in_favor = 0
+            uncertainty = 1
+        else:
+            percent_in_favor = results["true"] / (
+                results["true"] + results["false"]
+            )
+            uncertainty = results["undecided"] / (
+                results["true"] + results["false"]
+            )
 
         return AssemblyResponse(
             in_favor=results["true"],

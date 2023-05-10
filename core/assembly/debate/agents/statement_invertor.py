@@ -1,10 +1,10 @@
 from lib.llm.interfaces import Prompt, PromptMessage
 
-from .base import BaseAgent
-from .interfaces import AgentInterface
+from ...agent import BaseAgent
+from ...interfaces import AgentInterface
 
 
-class InvertorAgent(BaseAgent, AgentInterface):
+class StatementInvertorAgent(BaseAgent, AgentInterface):
     def _get_initial_prompt_text(self):
         return """
         Your job is to provide a sentence with the exact opposite of an input statement.
@@ -14,9 +14,7 @@ class InvertorAgent(BaseAgent, AgentInterface):
         Please provide a single sentence with the opposite sentiment.
         """
 
-    async def _build_completion_prompt(
-        self, input: str, conversation=None
-    ) -> str:
+    async def _build_completion_prompt(self, input: str) -> str:
         self.messages = [
             PromptMessage(
                 role="system",

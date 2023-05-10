@@ -30,7 +30,9 @@ class NewsMediaTool(QueryToolInterface):
         start_date=None,
         end_date=None,
         n_articles=1,
-        max_percent_per_source=0.35,
+        max_percent_per_source=1.0,
+        max_concurrency=10,
+        only_include_sources=None,
     ):
         self.client = client
         self.n_articles = n_articles
@@ -39,6 +41,9 @@ class NewsMediaTool(QueryToolInterface):
         self.end_date = end_date
 
         self.max_percent_per_source = max_percent_per_source
+        self.max_concurrency = max_concurrency
+
+        self.only_include_sources = only_include_sources
 
     async def _search(self, session, query: str) -> list[str]:
         start = 1
@@ -67,7 +72,9 @@ class NewsMediaTool(QueryToolInterface):
             try:
                 new_records = data["items"]
             except Exception:
-                raise Exception("Call to Google API failed.")
+                logger.log_exception("Could not retrieve all articles.")
+
+                return results
 
             if not new_records:
                 break
@@ -78,6 +85,15 @@ class NewsMediaTool(QueryToolInterface):
                 for record in new_records:
                     if not seen_sources.get(record["displayLink"]):
                         seen_sources[record["displayLink"]] = 0
+
+                    if self.only_include_sources:
+                        compatible_source = False
+                        for source in self.only_include_sources:
+                            if source in record["displayLink"]:
+                                compatible_source = True
+
+                        if not compatible_source:
+                            continue
 
                     if seen_sources[record["displayLink"]] >= (
                         self.n_articles * self.max_percent_per_source
@@ -101,6 +117,7 @@ class NewsMediaTool(QueryToolInterface):
             web_url,
             headers={"User-Agent": "Mozilla/5.0"},
         )
+
         data = await response.text()
 
         soup = BeautifulSoup(data, "html.parser")
@@ -192,9 +209,21 @@ class NewsMediaTool(QueryToolInterface):
             if len(search_results) == 0:
                 return []
 
-            return await asyncio.gather(
-                *[
-                    self._ingest_pages(session, original_prompt, web_url)
-                    for web_url in search_results[: self.n_articles]
-                ]
-            )
+            response = []
+
+            while len(response) < len(search_results[: self.n_articles]):
+                results_to_fetch = min(
+                    self.max_concurrency,
+                    len(search_results[: self.n_articles]) - len(response),
+                )
+
+                response += await asyncio.gather(
+                    *[
+                        self._ingest_pages(session, original_prompt, result)
+                        for result in search_results[
+                            len(response) : len(response) + results_to_fetch
+                        ]
+                    ]
+                )
+
+            return response

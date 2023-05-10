@@ -1,16 +1,17 @@
+from core.conversation.interfaces import ConversationInterface
 from lib.llm.interfaces import (
     Prompt,
     PromptMessage,
 )
 
-from ..interfaces import AgentInterface
-from ..base import BaseAgent
+from ...interfaces import AgentInterface
+from ...agent import BaseAgent
 
 from lib.log import logger
 
 
-class TeamLeadAgent(BaseAgent, AgentInterface):
-    def _get_rubric_prompt_text(self, input: str):
+class DebateModeratorAgent(BaseAgent, AgentInterface):
+    def _get_rubric_prompt_text(self, debate_topic: str):
         return f"""     
         You are pretending to be a team lead named {self.name}.
          
@@ -18,14 +19,14 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
         
         You are currently watching a debate between two of your reports (Hank and Sabrina) about an important decision.
 
-        The topic of the debate is: "{input}"
+        The topic of the debate is: "{debate_topic}"
 
         The next message will be the last few exchanges from the debate.
 
         Your should come up with a rubric that you can use to determine who won.
         """
 
-    def _get_grading_prompt_text(self, input: str):
+    def _get_grading_prompt_text(self, debate_topic: str):
         return f"""     
         You are pretending to be a team lead named {self.name}.
          
@@ -33,7 +34,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
         
         You are currently watching a debate between two of your reports (Hank and Sabrina) about an important decision.
 
-        The topic of the debate is: "{input}"
+        The topic of the debate is: "{debate_topic}"
 
         The next few messages will be the last few exchanges from the debate.
 
@@ -44,7 +45,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
         Please always refer to the analysts by their names: Hank and Sabrina.
         """
 
-    def _get_initial_prompt_text(self, input: str):
+    def _get_initial_prompt_text(self, debate_topic: str):
         return f"""     
         You are pretending to be a team lead named {self.name}.
          
@@ -52,7 +53,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
         
         You are currently watching a debate between two of your reports (Hank and Sabrina) about an important decision.
 
-        The topic of the debate is: "{input}"
+        The topic of the debate is: "{debate_topic}"
 
         The next few messages will be the last few exchanges from the debate.
 
@@ -67,7 +68,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
         Please always refer to the analysts by their names: Hank and Sabrina.
         """
 
-    def _get_question_prompt_text(self, input: str):
+    def _get_question_prompt_text(self, debate_topic: str):
         return f"""     
         You are pretending to be a team lead named {self.name}.
          
@@ -77,42 +78,21 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
 
         The next few messages will be the last few exchanges from the debate.
 
-        The topic of the debate is: "{input}"
+        The topic of the debate is: "{debate_topic}"
 
         You must think of a question that will allow you to assess who is right in this debate.
 
         Please respond with only the question that will help you figure out who is correct.
         """
 
-    def _get_reflection_prompt_text(self, input: str):
-        return f"""     
-        You are pretending to be a team lead named {self.name}.
-         
-        You need to make a decision for your team of analysts.
-        
-        You are currently watching a debate between two of your reports (Hank and Sabrina) about an important decision.
-
-        The topic of the debate is: "{input}"
-
-        The next few messages will be the last few exchanges from the debate.
-
-        The following message will be your first draft at a decision.
-
-        Please reflect and revise this draft.
-
-        Please fix any logical errors, and make sure that your argument is as strong as possible.
-
-        Please always refer to the analysts by their names: Hank and Sabrina.
-
-        Respond with your revised draft.
-        """
-
-    async def _build_questions_prompt(self, input: str, conversation=None):
+    async def _build_questions_prompt(
+        self, debate_topic: str, conversation=None
+    ):
         return Prompt(
             messages=[
                 PromptMessage(
                     role="system",
-                    content=self._get_question_prompt_text(input),
+                    content=self._get_question_prompt_text(debate_topic),
                 ),
                 *[
                     PromptMessage(
@@ -131,12 +111,14 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
             ]
         )
 
-    def _get_rubric_prompt(self, input: str, conversation=None):
+    def _get_rubric_prompt(
+        self, debate_topic: str, conversation: ConversationInterface
+    ):
         return Prompt(
             messages=[
                 PromptMessage(
                     role="system",
-                    content=self._get_rubric_prompt_text(input),
+                    content=self._get_rubric_prompt_text(debate_topic),
                 ),
                 *[
                     PromptMessage(
@@ -157,7 +139,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
 
     def _get_grading_prompt(
         self,
-        input: str,
+        debate_topic: str,
         rubric: str,
         relevant_knowledge: str,
         conversation=None,
@@ -166,7 +148,7 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
             messages=[
                 PromptMessage(
                     role="system",
-                    content=self._get_grading_prompt_text(input),
+                    content=self._get_grading_prompt_text(debate_topic),
                 ),
                 *[
                     PromptMessage(
@@ -195,36 +177,41 @@ class TeamLeadAgent(BaseAgent, AgentInterface):
         )
 
     async def _build_completion_prompt(
-        self, input: str, conversation=None
+        self, conversation: ConversationInterface
     ) -> str:
         relevant_knowledge = self.knowledge_store.recall_recent(
             n_knowledge_items=self.n_knowledge_items_per_prompt,
+            exclude_sources=["Debate topic"],
         )
+        debate_topic = self.knowledge_store.recall_recent(
+            n_knowledge_items=1,
+            include_sources=["Debate topic"],
+        )[0]
 
         rubric_prompt = self._get_rubric_prompt(
-            input, conversation=conversation
+            debate_topic, conversation=conversation
         )
         rubric = (
             await self.client.get_completions(
                 [rubric_prompt], **self._hyperparameters
             )
         )[0]
-        logger.log_internal(f"{self.name} thinks: {rubric}")
+        logger.log_internal(f"{self.name} plans: {rubric}")
 
         grading_prompt = self._get_grading_prompt(
-            input, rubric, relevant_knowledge, conversation=conversation
+            debate_topic, rubric, relevant_knowledge, conversation=conversation
         )
         grades = (
             await self.client.get_completions(
                 [grading_prompt], **self._hyperparameters
             )
         )[0]
-        logger.log_internal(f"{self.name} thinks: {grades}")
+        logger.log_internal(f"{self.name} plans: {grades}")
 
         messages = [
             PromptMessage(
                 role="system",
-                content=self._get_initial_prompt_text(input),
+                content=self._get_initial_prompt_text(debate_topic),
             ),
             *[
                 PromptMessage(

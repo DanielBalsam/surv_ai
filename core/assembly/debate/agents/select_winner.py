@@ -3,8 +3,8 @@ from lib.llm.interfaces import (
     PromptMessage,
 )
 
-from ..interfaces import AgentInterface
-from ..base import BaseAgent
+from ...interfaces import AgentInterface
+from ...agent import BaseAgent
 
 
 class SelectWinnerAgent(BaseAgent, AgentInterface):
@@ -12,16 +12,14 @@ class SelectWinnerAgent(BaseAgent, AgentInterface):
         return f"""        
         Your job is to determine who a team lead named Dan believes is winning a debate between two researchers named "Sabrina" and "Hank."
 
-        The next message will be Dan's summary of the conversation. He is never undecided.
+        The next message will be Dan's summary of the conversation. 
 
         You may only respond with the name of the researcher that Dan believes is winning.
 
-        Your only options are the names of the debating researchers: Hank or Sabrina
+        Your only options are the names of the debating researchers: Hank, Sabrina or "Undecided."
         """
 
-    async def _build_completion_prompt(
-        self, input: str, conversation=None
-    ) -> str:
+    async def _build_completion_prompt(self, prompt: str) -> str:
         self.messages = [
             PromptMessage(
                 role="system",
@@ -29,7 +27,7 @@ class SelectWinnerAgent(BaseAgent, AgentInterface):
             ),
             PromptMessage(
                 role="user",
-                content=input,
+                content=prompt,
             ),
         ]
 

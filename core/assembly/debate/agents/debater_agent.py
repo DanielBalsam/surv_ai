@@ -1,4 +1,3 @@
-from typing import Optional
 from core.conversation.interfaces import ConversationInterface
 from lib.log import logger
 from lib.llm.interfaces import (
@@ -6,11 +5,11 @@ from lib.llm.interfaces import (
     PromptMessage,
 )
 
-from ..interfaces import AgentInterface
-from ..base import BaseAgent
+from ...interfaces import AgentInterface
+from ...agent import BaseAgent
 
 
-class AnalystAgent(BaseAgent, AgentInterface):
+class DebaterAgent(BaseAgent, AgentInterface):
     def _get_initial_prompt_text(self, beliefs: str):
         return f"""     
         You are pretending to be an analyst named {self.name} who has a strong belief about a topic.
@@ -109,9 +108,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
         """
 
     async def _build_questions_prompt(
-        self,
-        input: str,
-        conversation: Optional[ConversationInterface] = None,
+        self, conversation: ConversationInterface
     ) -> Prompt:
         beliefs = self.knowledge_store.recall_recent(
             n_knowledge_items=self.n_knowledge_items_per_prompt,
@@ -155,9 +152,7 @@ class AnalystAgent(BaseAgent, AgentInterface):
         return Prompt(messages=messages)
 
     async def _build_information_assimilation_prompt(
-        self,
-        input: str,
-        conversation: Optional[ConversationInterface] = None,
+        self, conversation: ConversationInterface
     ) -> Prompt:
         beliefs = self.knowledge_store.recall_recent(
             n_knowledge_items=self.n_knowledge_items_per_prompt,
@@ -194,22 +189,17 @@ class AnalystAgent(BaseAgent, AgentInterface):
         return Prompt(messages=messages)
 
     async def _build_completion_prompt(
-        self,
-        input: str,
-        conversation: Optional[ConversationInterface] = None,
+        self, conversation: ConversationInterface
     ) -> Prompt:
         argument_plan_prompt = (
-            await self._build_information_assimilation_prompt(
-                input, conversation
-            )
+            await self._build_information_assimilation_prompt(conversation)
         )
         argument_plan = (
             await self.client.get_completions(
                 [argument_plan_prompt], **self._hyperparameters
             )
         )[0]
-
-        logger.log_internal(f"{self.name} thinks: {argument_plan}")
+        logger.log_internal(f"{self.name} plans: {argument_plan}")
 
         beliefs = self.knowledge_store.recall_recent(
             n_knowledge_items=self.n_knowledge_items_per_prompt,

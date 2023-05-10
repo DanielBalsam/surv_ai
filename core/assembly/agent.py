@@ -3,11 +3,10 @@ from random import choice
 from typing import Optional
 
 from colorama import Fore
-
 from core.conversation.interfaces import ConversationInterface
+
 from core.knowledge_store.interfaces import Knowledge, KnowledgeStoreInterface
 from core.knowledge_store.local import LocalKnowledgeStore
-from lib.log import logger
 from lib.llm.interfaces import LargeLanguageModelClientInterface, Prompt
 
 
@@ -47,15 +46,13 @@ class BaseAgent(ABC):
         )
 
     @abstractmethod
-    async def _build_completion_prompt(
-        self, input: str, conversation: Optional[ConversationInterface] = None
-    ) -> Prompt:
+    async def _build_completion_prompt(self, prompt: str) -> Prompt:
         ...
 
-    async def prompt(
-        self, input: str, conversation: Optional[ConversationInterface] = None
+    async def complete(
+        self, prompt: str | ConversationInterface, *args, **kwargs
     ) -> str:
-        prompt = await self._build_completion_prompt(input, conversation)
+        prompt = await self._build_completion_prompt(prompt, *args, **kwargs)
 
         response = (
             await self.client.get_completions(
