@@ -1,7 +1,7 @@
-# HyperAssembly
+# `HyperAssembly`
 ## Multi-agent modeling with large language models
 
-**HyperAssembly** is a large language model framework designed for multi-agent modeling.
+**`HyperAssembly`** is a large language model framework designed for multi-agent modeling.
 
 **Multi-agent modeling** is the process of using the actions of various agents in order to
 produce statistical models. In our case, these models are created by having agents query and process text
@@ -9,18 +9,27 @@ from a robust data corpus, and then "reason" with the information extracted from
 produce a data point.
 
 Given the stochastic nature of large language models, each data point may vary - however if a large
-enough sample of these data points is taken, the statistical models that can be produced can have
-interesting emergent behaviors. 
+enough sample of agents are used, the models that can be produced can effective for comparative analysis.
 
 The abstraction in this repository that is capable of producing a multi-agent model is referred to as an `Assembly`.
+An assembly takes a hypothesis as an argument and returns a probability estimate that hypothesis is correct.
 
-The models produced are ultimately a form of sentiment analysis, and thus the quality of the models is only
-as good as the data corpus that is provided. However, as demonstrated in the examples below, trends in `Assembly`
-produced models are able to fit to trends observed in other statistical models assessing the same problem area.
+**It is important not to put too much weight into any given probablility estimate, for reasons noted below.
+However interesting differences can be observed when varying `Assembly` parameters which can still provide insight
+against some independent variable.**
+
+The probability estimates produced are ultimately a form of sentiment analysis against a corpus of text. 
 
 With further advances in large language models, and AI broadly, multi-agent modeling may continue to prove a useful
 paradigm for classification and regression models, and may become a valuable extra data point for researchers investigating
 complex issues with many complex underlying variables.
+
+# Ways to use `HyperAssembly`
+## Comparing against a ground truth
+
+## Comparing changes over time
+
+## Measuring bias in different data corpuses
 
 ## Setup
 
