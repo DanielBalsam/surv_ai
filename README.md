@@ -1,4 +1,5 @@
 # `HyperAssembly`
+
 ## Multi-agent modeling with large language models
 
 **`HyperAssembly`** is a large language model framework designed for multi-agent modeling.
@@ -9,7 +10,7 @@ from a robust data corpus, and then "reason" with the information extracted from
 produce a data point.
 
 Given the stochastic nature of large language models, each data point may vary - however if a large
-enough sample of agents are used, the models that can be produced can effective for comparative analysis.
+enough sample of agents are used, the models that can be produced can be effective for comparative analysis.
 
 The abstraction in this repository that is capable of producing a multi-agent model is referred to as an `Assembly`.
 An assembly takes a hypothesis as an argument and returns a probability estimate that hypothesis is correct.
@@ -18,13 +19,14 @@ An assembly takes a hypothesis as an argument and returns a probability estimate
 However interesting differences can be observed when varying `Assembly` parameters which can still provide insight
 against some independent variable.**
 
-The probability estimates produced are ultimately a form of sentiment analysis against a corpus of text. 
+The probability estimates produced are ultimately a form of sentiment analysis against a corpus of text.
 
 With further advances in large language models, and AI broadly, multi-agent modeling may continue to prove a useful
 paradigm for classification and regression models, and may become a valuable extra data point for researchers investigating
 complex issues with many complex underlying variables.
 
 # Ways to use `HyperAssembly`
+
 ## Comparing against a ground truth
 
 ## Comparing changes over time
@@ -33,7 +35,7 @@ complex issues with many complex underlying variables.
 
 ## Setup
 
-This project depends on `poetry` for package management. 
+This project depends on `poetry` for package management.
 
 Once you have Python 3.11, and Poetry, you can set up the project locally by cloning and then running:
 
