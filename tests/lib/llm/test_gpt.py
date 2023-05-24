@@ -1,13 +1,12 @@
 from mock import Mock, patch
 
 from surv_ai import GPTClient, Prompt, PromptMessage
-from tests.utils import AsyncMock
 
 
 async def test_can_get_completion_happy_path():
-    with patch("aiohttp.ClientSession.post", new_callable=AsyncMock) as mock_post:
+    with patch("requests.post") as mock_post:
         mock_post.return_value.raise_for_status = Mock()
-        mock_post.return_value.json = AsyncMock(return_value={"choices": [{"message": {"content": "Hello World"}}]})
+        mock_post.return_value.json = Mock(return_value={"choices": [{"message": {"content": "Hello World"}}]})
         gpt_client = GPTClient(api_key="123")
         completions = await gpt_client.get_completions(
             [Prompt(messages=[PromptMessage(content="Hello World", role="user", name="User")])]
@@ -16,9 +15,9 @@ async def test_can_get_completion_happy_path():
 
 
 async def test_can_get_completion_with_multiple_messages():
-    with patch("aiohttp.ClientSession.post", new_callable=AsyncMock) as mock_post:
+    with patch("requests.post") as mock_post:
         mock_post.return_value.raise_for_status = Mock()
-        mock_post.return_value.json = AsyncMock(
+        mock_post.return_value.json = Mock(
             return_value={
                 "choices": [
                     {
@@ -46,9 +45,9 @@ async def test_can_get_completion_with_multiple_messages():
 
 
 async def test_can_set_hyper_parameters():
-    with patch("aiohttp.ClientSession.post", new_callable=AsyncMock) as mock_post:
+    with patch("requests.post") as mock_post:
         mock_post.return_value.raise_for_status = Mock()
-        mock_post.return_value.json = AsyncMock(return_value={"choices": [{"message": {"content": "Hello World"}}]})
+        mock_post.return_value.json = Mock(return_value={"choices": [{"message": {"content": "Hello World"}}]})
         gpt_client = GPTClient(api_key="123")
         await gpt_client.get_completions(
             [Prompt(messages=[PromptMessage(content="Hello World", role="user", name="User")])],

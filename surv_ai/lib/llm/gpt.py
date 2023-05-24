@@ -1,7 +1,7 @@
 import asyncio
 from enum import Enum
 
-from aiohttp import ClientSession
+import requests
 
 from surv_ai.lib.log import logger
 
@@ -25,7 +25,6 @@ class GPTClient(LargeLanguageModelClientInterface):
 
     async def _get_completion(
         self,
-        session: ClientSession,
         prompt: Prompt,
         attempt=1,
         presence_penalty=0,
@@ -75,41 +74,48 @@ class GPTClient(LargeLanguageModelClientInterface):
                 "max_tokens": max_tokens,
             }
 
-            response = await session.post(
-                "https://api.openai.com/v1/chat/completions",
-                json=request,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.api_key}",
-                },
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    json=request,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.api_key}",
+                    },
+                ),
             )
 
             try:
-                response_body = await response.json()
+                response_body = response.json()
             except Exception:
-                response_body = await response.text()
+                response_body = response.text
 
             response.raise_for_status()
         except Exception as e:
-            logger.log_exception(e)
-            if not response or response.status == 429 or response.status == 502:
-                await asyncio.sleep(0.5)
+            if not response or response.status_code == 429 or response.status_code == 502:
+                seconds_to_wait = 0.5 * attempt
+                logger.log_internal("Exceeded model rate limit: attempting backoff...")
+                await asyncio.sleep(seconds_to_wait)
 
                 if attempt < 5:
-                    return await self._get_completion(session, prompt, attempt + 1)
-            elif response.status == 400:
+                    return await self._get_completion(prompt, attempt + 1)
+            elif response.status_code == 400:
                 if attempt < 5:
+                    logger.log_internal("Exceeded model context length limit: attempting to reduce prompt size...")
+
                     return await self._get_completion(
-                        session,
                         prompt,
                         attempt + 1,
                         token_multiplier=token_multiplier - 0.2,
                     )
-            else:
-                raise Exception(
-                    f"Call to GPT API failed with status {response.status}.",
-                    response_body,
-                )
+
+            logger.log_exception(e)
+            raise Exception(
+                f"Call to GPT API failed with status {response.status_code}.",
+                response_body,
+            )
 
         return response_body["choices"][0]["message"]["content"]
 
@@ -123,19 +129,17 @@ class GPTClient(LargeLanguageModelClientInterface):
         max_tokens: int = 800,
         model=GPTModel.TURBO,
     ) -> list[str]:
-        async with ClientSession() as session:
-            return await asyncio.gather(
-                *[
-                    self._get_completion(
-                        session,
-                        prompt,
-                        presence_penalty=presence_penalty,
-                        frequency_penalty=frequency_penalty,
-                        temperature=temperature,
-                        top_p=top_p,
-                        max_tokens=max_tokens,
-                        model=model,
-                    )
-                    for prompt in prompts
-                ],
-            )
+        return await asyncio.gather(
+            *[
+                self._get_completion(
+                    prompt,
+                    presence_penalty=presence_penalty,
+                    frequency_penalty=frequency_penalty,
+                    temperature=temperature,
+                    top_p=top_p,
+                    max_tokens=max_tokens,
+                    model=model,
+                )
+                for prompt in prompts
+            ],
+        )

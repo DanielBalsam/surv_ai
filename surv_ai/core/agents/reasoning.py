@@ -47,15 +47,11 @@ class ReasoningAgent(BaseAgent, AgentInterface):
 
         {prompt}
            
-        You must decide whether you think the statement is more likely to be true or false.
-
-        The next set of messages will be a series of articles that you can use to help you make your decision.
+        The next set of messages will be a series of articles a user has provided that you can use to help you make your decision.
 
         In your response please construct a plan for how you will approach the problem.
 
-        Make sure your plan includes offering specific citations.
-
-        You must make the best decision possible with the information you have. You cannot be undecided.
+        You may only use the information the user has provided.
         """
 
     async def _get_plan(self, prompt: str, relevant_knowledge: list[Knowledge]):
@@ -158,7 +154,10 @@ class ReasoningAgent(BaseAgent, AgentInterface):
         logger.log_internal(f"{self.name} plans: {plan}")
 
         argument_in_favor = await self._get_argument_in_favor(prompt, relevant_knowledge)
+        logger.log_internal(f"{self.name} argues in favor: {argument_in_favor}")
+
         argument_against = await self._get_argument_against(prompt, relevant_knowledge)
+        logger.log_internal(f"{self.name} argues against: {argument_against}")
 
         messages = [
             PromptMessage(

@@ -15,11 +15,11 @@ async def test_inspect_tool_belt():
         ]
     )
     tool_belt = ToolBelt(
-        client=mock_client,
         tools=[mock_tool],
     )
 
     return_val = await tool_belt.inspect(
+        mock_client,
         "prompt",
         [],
     )
@@ -28,6 +28,7 @@ async def test_inspect_tool_belt():
     assert mock_client.get_completions.call_count == 1
     assert mock_tool.use.call_count == 1
     assert mock_tool.use.call_args[0] == (
+        mock_client,
         "prompt",
         "hello",
     )

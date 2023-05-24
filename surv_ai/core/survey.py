@@ -39,9 +39,11 @@ class Survey(SurveyInterface):
         index: int,
     ):
         try:
+            agent_name = f"ReasoningAgent #{index + 1}"
             reasoning_agent = ReasoningAgent(
                 self.client,
                 n_knowledge_items_per_prompt=self.max_knowledge_per_agent,
+                name=agent_name,
                 _hyperparameters={"temperature": 0.6},
             )
 
@@ -64,10 +66,10 @@ class Survey(SurveyInterface):
             binary_agent.teach_text(statement, "Assertion")
 
             response_conversation = Conversation()
-            response_conversation.add(response, f"Researcher #{index}", reasoning_agent.color)
+            response_conversation.add(response, agent_name, reasoning_agent.color)
 
             decision = await binary_agent.prompt(response_conversation)
-            summaries.add(decision, f"Researcher #{index}", reasoning_agent.color)
+            summaries.add(decision, agent_name, reasoning_agent.color)
 
             true_in_decision = "true" in decision.lower()
             false_in_decision = "false" in decision.lower()
@@ -91,7 +93,7 @@ class Survey(SurveyInterface):
         agents = 0
 
         try:
-            relevant_articles = await self.tool_belt.inspect(hypothesis, self.base_knowledge or [])
+            relevant_articles = await self.tool_belt.inspect(self.client, hypothesis, self.base_knowledge or [])
         except NoMemoriesFoundException:
             return SurveyResponse(
                 in_favor=0,

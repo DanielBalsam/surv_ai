@@ -1,15 +1,15 @@
-from mock import patch
+from mock import Mock, patch
 
 from surv_ai import GoogleCustomSearchTool, Knowledge
 from tests.utils import AsyncMock
 
 
 async def test_can_use_tool():
-    with patch("aiohttp.ClientSession.post", new_callable=AsyncMock):
+    with patch("requests.get", new_callable=Mock) as mock_get:
+        mock_get.return_value.text = "test"
         mock_client = AsyncMock()
         mock_client.get_completions = AsyncMock(return_value=["an article titled hello world"])
         mock_tool = GoogleCustomSearchTool(
-            llm_client=mock_client,
             google_api_key="123",
             google_search_engine_id="456",
         )
@@ -31,6 +31,7 @@ async def test_can_use_tool():
         )
 
         return_val = await mock_tool.use(
+            mock_client,
             "prompt",
             [],
         )

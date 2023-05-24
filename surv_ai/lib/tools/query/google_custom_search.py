@@ -1,7 +1,8 @@
 import asyncio
 import re
+from typing import Optional
 
-from aiohttp import ClientSession
+import requests
 from bs4 import BeautifulSoup
 
 from surv_ai.lib.knowledge_store.interfaces import Knowledge
@@ -25,9 +26,9 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     def __init__(
         self,
-        llm_client: LargeLanguageModelClientInterface,
-        google_api_key: str,
-        google_search_engine_id: str,
+        llm_client: Optional[LargeLanguageModelClientInterface] = None,
+        google_api_key: str = "",
+        google_search_engine_id: str = "",
         start_date=None,
         end_date=None,
         n_pages=1,
@@ -35,7 +36,15 @@ class GoogleCustomSearchTool(QueryToolInterface):
         max_concurrency=10,
         only_include_sources=None,
     ):
-        self.client = llm_client
+        if llm_client:
+            logger.log_warning(
+                "Deprecation warning: LargeLanguageModelClient no longer should be passed into tools on init."
+            )
+
+        if not google_api_key:
+            raise ValueError("google_api_key is required for GoogleCustomSearchTool")
+        elif not google_search_engine_id:
+            raise ValueError("google_search_engine_id is required for GoogleCustomSearchTool")
 
         self.google_api_key = google_api_key
         self.google_search_engine_id = google_search_engine_id
@@ -50,7 +59,7 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
         self.only_include_sources = only_include_sources
 
-    async def _search(self, session, query: str) -> list[str]:
+    async def _search(self, query: str) -> list[str]:
         start = 1
         results = []
 
@@ -71,8 +80,9 @@ class GoogleCustomSearchTool(QueryToolInterface):
             if self.end_date:
                 params["q"] += f" before:{self.end_date}"
 
-            async with session.get(self._base_url, params=params) as response:
-                data = await response.json()
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, lambda: requests.get(self._base_url, params=params))
+            data = response.json()
 
             try:
                 new_records = data["items"]
@@ -113,13 +123,14 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
         return results
 
-    async def _get_page_text(self, session: ClientSession, web_url: str) -> str:
-        response = await session.get(
-            web_url,
-            headers={"User-Agent": "Mozilla/5.0"},
+    async def _get_page_text(self, web_url: str) -> str:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.get(web_url, headers={"User-Agent": "Mozilla/5.0"}),
         )
 
-        data = await response.text()
+        data = response.text
 
         soup = BeautifulSoup(data, "html.parser")
 
@@ -131,45 +142,45 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     async def _ingest_page_information(
         self,
-        session,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         title: str,
         publication: str,
         web_url: str,
     ):
-        paragraphs = await self._get_page_text(session, web_url)
+        paragraphs = await self._get_page_text(web_url)
 
         prompt = Prompt(
             messages=[
                 PromptMessage(
-                    content=f"""A user has asked you some questions:
+                    content=f"""A user has presented you with a hypothesis:
                     
                     {original_prompt}
 
                     All subsequent messages will be paragraphs from a {publication} article titled "{title}."
 
-                    Your job is to extract any useful information that might help someone answer these questions.
+                    Your job is to extract any useful information that might help someone evaluate this hypothesis.
 
                     Remember to include as much data and concrete examples as possible from the article.
 
-                    For each useful piece of information you extract, please state why it relates to the original questions.
+                    For each useful piece of information you extract, please state why it relates to the original hypothesis.
                     """,
                     role="system",
                 ),
                 *[PromptMessage(content=paragraph, role="user", name="Article") for paragraph in paragraphs],
                 PromptMessage(
                     role="assistant",
-                    content=f"I have read the Wikpedia article entitled {title} and some useful information is:",
+                    content=f"I have read the {publication} article entitled {title} and some useful information is:",
                 ),
             ],
         )
-        response = await self.client.get_completions([prompt])
+        response = await llm_client.get_completions([prompt])
 
         return response[0]
 
     async def _ingest_pages(
         self,
-        session: ClientSession,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         result: dict,
     ):
@@ -181,12 +192,13 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
             logger.log_context(f"......Retrieving {publication} article with title {title}......")
             page_summary = await self._ingest_page_information(
-                session,
+                llm_client,
                 original_prompt,
                 title,
                 publication,
                 result["link"],
             )
+            logger.log_internal(f"Summary of {publication} article with title {title}: {page_summary}")
 
             return Knowledge(
                 text=f'{publication} article entitled "{title}": {page_summary}',
@@ -198,28 +210,28 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     async def use(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         search_query: str,
     ) -> list[Knowledge]:
-        async with ClientSession() as session:
-            search_results = await self._search(session, search_query)
+        search_results = await self._search(search_query)
 
-            if len(search_results) == 0:
-                return []
+        if len(search_results) == 0:
+            return []
 
-            response = []
+        response = []
 
-            while len(response) < len(search_results[: self.n_pages]):
-                results_to_fetch = min(
-                    self.max_concurrency,
-                    len(search_results[: self.n_pages]) - len(response),
-                )
+        while len(response) < len(search_results[: self.n_pages]):
+            results_to_fetch = min(
+                self.max_concurrency,
+                len(search_results[: self.n_pages]) - len(response),
+            )
 
-                response += await asyncio.gather(
-                    *[
-                        self._ingest_pages(session, original_prompt, result)
-                        for result in search_results[len(response) : len(response) + results_to_fetch]
-                    ]
-                )
+            response += await asyncio.gather(
+                *[
+                    self._ingest_pages(llm_client, original_prompt, result)
+                    for result in search_results[len(response) : len(response) + results_to_fetch]
+                ]
+            )
 
-            return [r for r in response if r]
+        return [r for r in response if r]

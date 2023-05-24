@@ -12,10 +12,10 @@ class ToolInterface(Protocol):
     instruction: str
     command: Pattern
 
-    def __init__(self, client: LargeLanguageModelClientInterface, *args, **kwargs):
+    def __init__(self, _: LargeLanguageModelClientInterface, *args, **kwargs):
         ...
 
-    async def use(self, *args, **kwargs):
+    async def use(self, client: LargeLanguageModelClientInterface, *args, **kwargs):
         ...
 
 
@@ -24,10 +24,10 @@ class ToolBeltInterface(Protocol):
 
     def __init__(
         self,
-        client: LargeLanguageModelClientInterface,
+        _: LargeLanguageModelClientInterface,
         tools: list[ToolInterface],
     ):
         ...
 
-    async def observe(self, query: str):
+    async def inspect(self, client: LargeLanguageModelClientInterface, query: str):
         ...
