@@ -1,7 +1,7 @@
 import asyncio
 import re
 
-from aiohttp import ClientSession
+import requests
 from bs4 import BeautifulSoup
 
 from surv_ai.lib.knowledge_store.interfaces import Knowledge
@@ -50,7 +50,7 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
         self.only_include_sources = only_include_sources
 
-    async def _search(self, session, query: str) -> list[str]:
+    async def _search(self, query: str) -> list[str]:
         start = 1
         results = []
 
@@ -71,8 +71,9 @@ class GoogleCustomSearchTool(QueryToolInterface):
             if self.end_date:
                 params["q"] += f" before:{self.end_date}"
 
-            async with session.get(self._base_url, params=params) as response:
-                data = await response.json()
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, lambda: requests.get(self._base_url, params=params))
+            data = response.json()
 
             try:
                 new_records = data["items"]
@@ -113,13 +114,14 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
         return results
 
-    async def _get_page_text(self, session: ClientSession, web_url: str) -> str:
-        response = await session.get(
-            web_url,
-            headers={"User-Agent": "Mozilla/5.0"},
+    async def _get_page_text(self, web_url: str) -> str:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.get(web_url, headers={"User-Agent": "Mozilla/5.0"}),
         )
 
-        data = await response.text()
+        data = response.text
 
         soup = BeautifulSoup(data, "html.parser")
 
@@ -131,13 +133,12 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     async def _ingest_page_information(
         self,
-        session,
         original_prompt: str,
         title: str,
         publication: str,
         web_url: str,
     ):
-        paragraphs = await self._get_page_text(session, web_url)
+        paragraphs = await self._get_page_text(web_url)
 
         prompt = Prompt(
             messages=[
@@ -169,7 +170,6 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     async def _ingest_pages(
         self,
-        session: ClientSession,
         original_prompt: str,
         result: dict,
     ):
@@ -181,12 +181,12 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
             logger.log_context(f"......Retrieving {publication} article with title {title}......")
             page_summary = await self._ingest_page_information(
-                session,
                 original_prompt,
                 title,
                 publication,
                 result["link"],
             )
+            logger.log_internal(f"Summary of  {publication} article with title {title}: {page_summary}")
 
             return Knowledge(
                 text=f'{publication} article entitled "{title}": {page_summary}',
@@ -201,25 +201,24 @@ class GoogleCustomSearchTool(QueryToolInterface):
         original_prompt: str,
         search_query: str,
     ) -> list[Knowledge]:
-        async with ClientSession() as session:
-            search_results = await self._search(session, search_query)
+        search_results = await self._search(search_query)
 
-            if len(search_results) == 0:
-                return []
+        if len(search_results) == 0:
+            return []
 
-            response = []
+        response = []
 
-            while len(response) < len(search_results[: self.n_pages]):
-                results_to_fetch = min(
-                    self.max_concurrency,
-                    len(search_results[: self.n_pages]) - len(response),
-                )
+        while len(response) < len(search_results[: self.n_pages]):
+            results_to_fetch = min(
+                self.max_concurrency,
+                len(search_results[: self.n_pages]) - len(response),
+            )
 
-                response += await asyncio.gather(
-                    *[
-                        self._ingest_pages(session, original_prompt, result)
-                        for result in search_results[len(response) : len(response) + results_to_fetch]
-                    ]
-                )
+            response += await asyncio.gather(
+                *[
+                    self._ingest_pages(original_prompt, result)
+                    for result in search_results[len(response) : len(response) + results_to_fetch]
+                ]
+            )
 
-            return [r for r in response if r]
+        return [r for r in response if r]

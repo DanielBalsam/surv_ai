@@ -1,7 +1,7 @@
 import asyncio
 import re
 
-from aiohttp import ClientSession
+import requests
 from bs4 import BeautifulSoup
 
 from surv_ai.lib.knowledge_store.interfaces import Knowledge
@@ -33,18 +33,19 @@ class WikipediaTool(QueryToolInterface):
 
         self._already_searched = dict()
 
-    async def _search(self, session, query: str) -> list[str]:
+    async def _search(self, query: str) -> list[str]:
         params = {
             "action": "query",
             "format": "json",
             "list": "search",
             "srsearch": re.sub(r"[^A-Za-z0-9 ]+", "", query),
         }
-        async with session.get(self._base_url, params=params) as response:
-            data = await response.json()
-            return [result["title"] for result in data["query"]["search"]]
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, lambda: requests.get(self._base_url, params=params))
+        data = response.json()
+        return [result["title"] for result in data["query"]["search"]]
 
-    async def _get_page_text(self, session, page_title: str) -> str:
+    async def _get_page_text(self, page_title: str) -> str:
         if page_title in self._already_searched:
             return self._already_searched[page_title]
 
@@ -55,34 +56,34 @@ class WikipediaTool(QueryToolInterface):
             "prop": "text",
         }
 
-        async with session.get(self._base_url, params=params) as response:
-            data = await response.json()
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, lambda: requests.get(self._base_url, params=params))
+        data = response.json()
 
-            try:
-                html_content = data["parse"]["text"]["*"]
+        try:
+            html_content = data["parse"]["text"]["*"]
 
-                soup = BeautifulSoup(html_content, "html.parser")
+            soup = BeautifulSoup(html_content, "html.parser")
 
-                results = []
-                for paragraph in soup.find_all("p"):
-                    paragraph_text = paragraph.text.strip()
+            results = []
+            for paragraph in soup.find_all("p"):
+                paragraph_text = paragraph.text.strip()
 
-                    if paragraph_text:
-                        results.append(paragraph_text)
+                if paragraph_text:
+                    results.append(paragraph_text)
 
-                self._already_searched[page_title] = results
-            except Exception:
-                return ""
+            self._already_searched[page_title] = results
+        except Exception:
+            return ""
 
-            return results
+        return results
 
     async def _ingest_page_information(
         self,
-        session,
         original_prompt: str,
         page_title: str,
     ):
-        paragraphs = await self._get_page_text(session, page_title)
+        paragraphs = await self._get_page_text(page_title)
 
         prompt = Prompt(
             messages=[
@@ -114,16 +115,15 @@ class WikipediaTool(QueryToolInterface):
 
     async def _ingest_pages(
         self,
-        session: ClientSession,
         original_prompt: str,
         page_title: str,
     ):
         logger.log_context(f"......Learning Wikipedia page with title {page_title}......")
         page_summary = await self._ingest_page_information(
-            session,
             original_prompt,
             page_title,
         )
+        logger.log_internal(f"Summary of Wikipedia article with title {page_title}: {page_summary}")
 
         source = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
 
@@ -167,17 +167,13 @@ class WikipediaTool(QueryToolInterface):
         original_prompt: str,
         search_query: str,
     ) -> list[Knowledge]:
-        async with ClientSession() as session:
-            search_results = await self._search(session, search_query)
+        search_results = await self._search(search_query)
 
-            relevant_results = (await self._filter_relevant_pages(original_prompt, search_results)).split(", ")
+        relevant_results = (await self._filter_relevant_pages(original_prompt, search_results)).split(", ")
 
-            if len(relevant_results) == 0:
-                return []
+        if len(relevant_results) == 0:
+            return []
 
-            return await asyncio.gather(
-                *[
-                    self._ingest_pages(session, original_prompt, page_title)
-                    for page_title in relevant_results[: self.n_articles]
-                ]
-            )
+        return await asyncio.gather(
+            *[self._ingest_pages(original_prompt, page_title) for page_title in relevant_results[: self.n_articles]]
+        )

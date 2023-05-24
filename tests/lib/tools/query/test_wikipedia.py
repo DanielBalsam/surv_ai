@@ -5,7 +5,7 @@ from tests.utils import AsyncMock
 
 
 async def test_can_use_tool():
-    with patch("aiohttp.ClientSession.post", new_callable=AsyncMock):
+    with patch("requests.post"):
         mock_client = AsyncMock()
         mock_client.get_completions = AsyncMock(return_value=["an article titled hello world"])
         mock_tool = WikipediaTool(
