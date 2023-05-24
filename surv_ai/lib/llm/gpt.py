@@ -110,7 +110,7 @@ class GPTClient(LargeLanguageModelClientInterface):
                         attempt + 1,
                         token_multiplier=token_multiplier - 0.2,
                     )
-            
+
             logger.log_exception(e)
             raise Exception(
                 f"Call to GPT API failed with status {response.status_code}.",
