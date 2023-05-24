@@ -153,24 +153,24 @@ class GoogleCustomSearchTool(QueryToolInterface):
         prompt = Prompt(
             messages=[
                 PromptMessage(
-                    content=f"""A user has asked you some questions:
+                    content=f"""A user has presented you with a hypothesis:
                     
                     {original_prompt}
 
                     All subsequent messages will be paragraphs from a {publication} article titled "{title}."
 
-                    Your job is to extract any useful information that might help someone answer these questions.
+                    Your job is to extract any useful information that might help someone evaluate this hypothesis.
 
                     Remember to include as much data and concrete examples as possible from the article.
 
-                    For each useful piece of information you extract, please state why it relates to the original questions.
+                    For each useful piece of information you extract, please state why it relates to the original hypothesis.
                     """,
                     role="system",
                 ),
                 *[PromptMessage(content=paragraph, role="user", name="Article") for paragraph in paragraphs],
                 PromptMessage(
                     role="assistant",
-                    content=f"I have read the Wikpedia article entitled {title} and some useful information is:",
+                    content=f"I have read the {publication} article entitled {title} and some useful information is:",
                 ),
             ],
         )
