@@ -78,25 +78,28 @@ class AnthropicClient(LargeLanguageModelClientInterface):
 
             response.raise_for_status()
         except Exception as e:
-            logger.log_exception(e)
-
             if not response or response.status == 429 or response.status == 502:
-                await asyncio.sleep(0.5)
+                seconds_to_wait = 0.5 * attempt
+                logger.log_internal("Exceeded model rate limit: attempting backoff...")
+                await asyncio.sleep(seconds_to_wait)
 
                 if attempt < 5:
                     return await self._get_completion(prompt, attempt + 1)
             elif response.status == 400:
                 if attempt < 5:
+                    logger.log_internal("Exceeded model context length limit: attempting to reduce prompt size...")
+
                     return await self._get_completion(
                         prompt,
                         attempt + 1,
                         token_multiplier=token_multiplier - 0.2,
                     )
-            else:
-                raise Exception(
-                    f"Call to Anthropic API failed with status {response.status}.",
-                    response_body,
-                )
+
+            logger.log_exception(e)
+            raise Exception(
+                f"Call to Anthropic API failed with status {response.status}.",
+                response_body,
+            )
 
         return response_body["completion"]
 
