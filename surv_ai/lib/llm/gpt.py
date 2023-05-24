@@ -94,14 +94,14 @@ class GPTClient(LargeLanguageModelClientInterface):
 
             response.raise_for_status()
         except Exception as e:
-            if not response or response.status == 429 or response.status == 502:
+            if not response or response.status_code == 429 or response.status_code == 502:
                 seconds_to_wait = 0.5 * attempt
                 logger.log_internal("Exceeded model rate limit: attempting backoff...")
                 await asyncio.sleep(seconds_to_wait)
 
                 if attempt < 5:
                     return await self._get_completion(prompt, attempt + 1)
-            elif response.status == 400:
+            elif response.status_code == 400:
                 if attempt < 5:
                     logger.log_internal("Exceeded model context length limit: attempting to reduce prompt size...")
 
@@ -110,10 +110,10 @@ class GPTClient(LargeLanguageModelClientInterface):
                         attempt + 1,
                         token_multiplier=token_multiplier - 0.2,
                     )
-
+            
             logger.log_exception(e)
             raise Exception(
-                f"Call to GPT API failed with status {response.status}.",
+                f"Call to GPT API failed with status {response.status_code}.",
                 response_body,
             )
 

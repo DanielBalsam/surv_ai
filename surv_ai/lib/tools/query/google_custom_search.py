@@ -198,7 +198,7 @@ class GoogleCustomSearchTool(QueryToolInterface):
                 publication,
                 result["link"],
             )
-            logger.log_internal(f"Summary of  {publication} article with title {title}: {page_summary}")
+            logger.log_internal(f"Summary of {publication} article with title {title}: {page_summary}")
 
             return Knowledge(
                 text=f'{publication} article entitled "{title}": {page_summary}',

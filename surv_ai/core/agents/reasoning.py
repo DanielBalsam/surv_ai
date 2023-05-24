@@ -158,7 +158,10 @@ class ReasoningAgent(BaseAgent, AgentInterface):
         logger.log_internal(f"{self.name} plans: {plan}")
 
         argument_in_favor = await self._get_argument_in_favor(prompt, relevant_knowledge)
+        logger.log_internal(f"{self.name} argues in favor: {argument_in_favor}")
+
         argument_against = await self._get_argument_against(prompt, relevant_knowledge)
+        logger.log_internal(f"{self.name} argues against: {argument_against}")
 
         messages = [
             PromptMessage(
