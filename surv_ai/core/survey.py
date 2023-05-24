@@ -91,7 +91,7 @@ class Survey(SurveyInterface):
         agents = 0
 
         try:
-            relevant_articles = await self.tool_belt.inspect(hypothesis, self.base_knowledge or [])
+            relevant_articles = await self.tool_belt.inspect(self.client, hypothesis, self.base_knowledge or [])
         except NoMemoriesFoundException:
             return SurveyResponse(
                 in_favor=0,

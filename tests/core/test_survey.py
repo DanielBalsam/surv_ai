@@ -15,8 +15,9 @@ async def test_conduct():
         mock_binary_agent.return_value.prompt = AsyncMock(return_value="True")
 
         mock_tool_belt = AsyncMock()
+        mock_client = AsyncMock()
         survey = Survey(
-            client=AsyncMock(),
+            client=mock_client,
             tool_belt=mock_tool_belt,
             n_agents=10,
         )
@@ -32,7 +33,7 @@ async def test_conduct():
         response = await survey.conduct("test prompt")
 
         assert survey.tool_belt.inspect.call_count == 1
-        assert survey.tool_belt.inspect.call_args_list[0][0][0] == "test prompt"
+        assert survey.tool_belt.inspect.call_args_list[0][0] == (mock_client, "test prompt", [])
 
         assert mock_reasoning_agent.call_count == 10
         assert mock_binary_agent.call_count == 10

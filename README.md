@@ -104,35 +104,37 @@ Let's start by establishing the system's ability to figure out if information is
 from surv_ai import (
     GPTClient,
     Survey,
-    ToolBelt,x
+    ToolBelt,
     GoogleCustomSearchTool,
     Knowledge
 )
 
 client = GPTClient(os.environ["OPEN_AI_API_KEY"])
 
-survey = Survey(
-    client,
-    tool_belt=ToolBelt(
-        client,
-        tools=[
-            GoogleCustomSearchTool(
-                client,
-                os.environ["GOOGLE_API_KEY"],
-                os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                start_date="2023-01-01",
-                end_date="2023-05-01",
-                n_pages=10,
-            )
-        ]
+tool_belt = ToolBelt(
+    tools=[
+        GoogleCustomSearchTool(
+            google_api_key=os.environ["GOOGLE_API_KEY"],
+            google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
+            start_date="2023-01-01",
+            end_date="2023-05-01",
+            n_pages=10,
+        )
+    ]
+)
+base_knowledge = [
+    Knowledge(
+        text="It is currently 2023/05/01, all the articles are from 2023.",
+        source="Additional context",
     ),
+]
+
+survey = Survey(
+    client=client,
+    tool_belt=tool_belt,
+    base_knowledge=base_knowledge,
+    max_knowledge_per_agent=3,
     n_agents=10,
-    base_knowledge=[
-        Knowledge(
-            text="It is currently 2023/05/01, all the articles are from 2023.",
-            source="Additional context",
-        ),
-    ],
 )
 
 await survey.conduct(
@@ -157,28 +159,30 @@ from surv_ai import (
 
 client = GPTClient(os.environ["OPEN_AI_API_KEY"])
 
-survey = Survey(
-    client,
-    tool_belt=ToolBelt(
-        client,
-        tools=[
-            GoogleCustomSearchTool(
-                client,
-                os.environ["GOOGLE_API_KEY"],
-                os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                n_pages=10,
-                start_date="2023-01-01",
-                end_date="2023-05-01",
-            )
-        ]
+tool_belt = ToolBelt(
+    tools=[
+        GoogleCustomSearchTool(
+            google_api_key=os.environ["GOOGLE_API_KEY"],
+            google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
+            start_date="2023-01-01",
+            end_date="2023-05-01",
+            n_pages=10,
+        )
+    ]
+)
+base_knowledge = [
+    Knowledge(
+        text="It is currently 2023/05/01, all the articles are from 2023.",
+        source="Additional context",
     ),
+]
+
+survey = Survey(
+    client=client,
+    tool_belt=tool_belt,
+    base_knowledge=base_knowledge,
+    max_knowledge_per_agent=3,
     n_agents=10,
-    base_knowledge=[
-        Knowledge(
-            text="It is currently 2023/05/01, all the articles are from 2023.",
-            source="Additional context",
-        ),
-    ],
 )
 
 await survey.conduct(
@@ -201,11 +205,42 @@ from surv_ai import (
     ToolBelt,
     GoogleCustomSearchTool,
     Knowledge,
+    Survey,
     SurveyParameter
 )
 
 
 client = GPTClient(os.environ["OPEN_AI_API_KEY"])
+
+def build_parameter(date_range: tuple[str, str]):
+    tool_belt = ToolBelt(
+        tools=[
+            GoogleCustomSearchTool(
+                google_api_key=os.environ["GOOGLE_API_KEY"],
+                google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
+                n_pages=20,
+                start_date=date_range[0],
+                end_date=date_range[1]
+            ),
+        ],
+    )
+    base_knowledge = [
+        Knowledge(
+            text=f"It is currently {date_range[0]}. The included articles were published between {date_range[0]} and {date_range[1]}",
+            source="Additional context",
+        ),
+    ]
+    return SurveyParameter(
+        independent_variable=date_range[1],
+        kwargs={
+            "client": client,
+            "n_agents": 100,
+            "max_knowledge_per_agent":20,
+            "max_concurrency": 10,
+            "tool_belt": tool_belt,
+            "base_knowledge": base_knowledge,
+        },
+    )
 
 date_ranges = [
     ('2022-05-01', '2022-06-01'),
@@ -218,35 +253,7 @@ date_ranges = [
 
 model = Model(
     Survey,
-    parameters=[
-        SurveyParameter(
-            independent_variable=range[1],
-            parameters={
-                "n_agents": 100,
-                "max_concurrency": 10,
-                "tool_belt": ToolBelt(
-                    client,
-                    [
-                        GoogleCustomSearchTool(
-                            client,
-                            os.environ["GOOGLE_API_KEY"],
-                            os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                            n_pages=20,
-                            start_date=range[0],
-                            end_date=range[1]
-                        ),
-                    ],
-                ),
-                "base_knowledge": [
-                    Knowledge(
-                        text=f"It is currently {range[0]}. The included articles were published between {range[0]} and {range[1]}",
-                        source="Additional context",
-                    ),
-                ],
-            },
-        )
-        for range in date_ranges
-    ],
+    parameters=[build_parameter(date_range) for date_range in date_ranges],
 )
 
 results = await model.build(
@@ -274,6 +281,36 @@ from surv_ai import (
 )
 client = GPTClient(os.environ["OPEN_AI_API_KEY"])
 
+def build_parameter(date_range: tuple[str, str]):
+    tool_belt = ToolBelt(
+        tools=[
+            GoogleCustomSearchTool(
+                google_api_key=os.environ["GOOGLE_API_KEY"],
+                google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
+                n_pages=20,
+                start_date=date_range[0],
+                end_date=date_range[1]
+            ),
+        ],
+    )
+    base_knowledge = [
+        Knowledge(
+            text=f"It is currently {date_range[0]}. The included articles were published between {date_range[0]} and {date_range[1]}",
+            source="Additional context",
+        ),
+    ]
+    return SurveyParameter(
+        independent_variable=date_range[1],
+        kwargs={
+            "client": client,
+            "n_agents": 100,
+            "max_knowledge_per_agent":20,
+            "max_concurrency": 10,
+            "tool_belt": tool_belt,
+            "base_knowledge": base_knowledge,
+        },
+    )
+
 date_ranges = [
     ('2021-09-01', '2022-01-01'),
     ('2022-01-01', '2022-03-01'),
@@ -286,35 +323,7 @@ date_ranges = [
 
 model = Model(
     Survey,
-    parameters=[
-        SurveyParameter(
-            independent_variable=range[1],
-            parameters={
-                "n_agents": 100,
-                "max_concurrency": 5,
-                "tool_belt": ToolBelt(
-                    client,
-                    [
-                        GoogleCustomSearchTool(
-                            client,
-                            os.environ["GOOGLE_API_KEY"],
-                            os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                            n_pages=10,
-                            start_date=range[0],
-                            end_date=range[1]
-                        ),
-                    ],
-                ),
-                "base_knowledge": [
-                    Knowledge(
-                        text=f"It is currently {range[0]}. The included articles were published between {range[0]} and {range[1]}",
-                        source="Additional context",
-                    ),
-                ],
-            },
-        )
-        for range in date_ranges
-    ],
+    parameters=[build_parameter(date_range) for date_range in date_ranges],
 )
 
 results = await model.build(
@@ -343,45 +352,49 @@ from surv_ai import (
     SurveyParameter
 )
 
-sources = [
+client = GPTClient(os.environ["OPEN_AI_API_KEY"])
+
+def build_parameter(news_source: str):
+    tool_belt = ToolBelt(
+        tools=[
+            GoogleCustomSearchTool(
+                google_api_key=os.environ["GOOGLE_API_KEY"],
+                google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
+                n_pages=20,
+                start_date="2023-05-01",
+                end_date="2023-06-01",
+                only_include_sources=[news_source]
+            ),
+        ],
+    )
+    base_knowledge = [
+        Knowledge(
+            text=f"It is currently 2023-06-01. The included articles were published between 2023-05-01 and 2023-06-01",
+            source="Additional context",
+        ),
+    ]
+    return SurveyParameter(
+        independent_variable=news_source,
+        kwargs={
+            "client": client,
+            "n_agents": 100,
+            "max_knowledge_per_agent":10,
+            "max_concurrency": 10,
+            "tool_belt": tool_belt,
+            "base_knowledge": base_knowledge,
+        },
+    )
+
+news_sources = [
     "nytimes.com",
     "cnn.com",
     "wsj.com",
     "foxnews.com",
 ]
 
-client = GPTClient(os.environ["OPEN_AI_API_KEY"])
 model = Model(
     Survey,
-    parameters=[
-        SurveyParameter(
-            independent_variable=source,
-            parameters={
-                "tool_belt": ToolBelt(
-                    client,
-                    tools=[
-                        GoogleCustomSearchTool(
-                            client,
-                            os.environ["GOOGLE_API_KEY"],
-                            os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                            n_pages=10,
-                            start_date="2023-05-01",
-                            end_date="2023-06-01",
-                            only_include_sources=[source]
-                        )
-                    ]
-                ),
-                "n_agents": 100,
-                "base_knowledge": [
-                    Knowledge(
-                        text=f"It is currently 2023-06-01. The included articles were published between 2023-05-01 and 2023-06-01",
-                        source="Additional context",
-                    ),
-                ],
-            }
-        )
-        for source in sources
-    ],
+    parameters=[build_parameter(news_source) for news_source in news_sources],
 )
 results = await model.build(
     "Republicans are responsible for the impending debt ceiling crisis."
@@ -407,44 +420,46 @@ from surv_ai import (
     GoogleCustomSearchTool,
     Knowledge,
     Survey,
-    SurveyParameter
+    SurveyParameter,
+    LargeLanguageModelClientInterface
 )
 
-
 clients = [AnthropicClient(os.environ["ANTHROPIC_API_KEY"]), GPTClient(os.environ["OPEN_AI_API_KEY"])]
+
+def build_parameter(client: LargeLanguageModelClientInterface):
+    tool_belt = ToolBelt(
+        tools=[
+            GoogleCustomSearchTool(
+                google_api_key=os.environ["GOOGLE_API_KEY"],
+                google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
+                n_pages=20,
+                start_date="2023-01-01",
+                end_date="2024-05-01",
+                max_concurrency=3,
+            )
+        ],
+    )
+    base_knowledge = [
+        Knowledge(
+            text=f"It is currently 2023-06-01. The included articles were published between 2023-01-01 and 2023-06-01",
+            source="Additional context",
+        ),
+    ]
+    return SurveyParameter(
+        independent_variable=client.__class__.__name__,
+        kwargs={
+            "client": client,
+            "n_agents": 100,
+            "max_knowledge_per_agent":20,
+            "max_concurrency": 3,
+            "tool_belt": tool_belt,
+            "base_knowledge": base_knowledge,
+        },
+    )
+
 model = Model(
     Survey,
-    parameters=[
-        SurveyParameter(
-            independent_variable=client.__class__.__name__,
-            kwargs={
-                "client": client,
-                "tool_belt": ToolBelt(
-                    client,
-                    tools=[
-                        GoogleCustomSearchTool(
-                            client,
-                            os.environ["GOOGLE_API_KEY"],
-                            os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                            n_pages=10,
-                            start_date="2023-01-01",
-                            end_date="2023-06-01",
-                            max_concurrency=3,
-                        )
-                    ]
-                ),
-                "n_agents": 100,
-                "max_concurrency": 3,
-                "base_knowledge": [
-                    Knowledge(
-                        text=f"It is currently 2023-06-01. The included articles were published between 2023-01-01 and 2023-06-01",
-                        source="Additional context",
-                    ),
-                ],
-            }
-        )
-        for client in clients
-    ],
+    parameters=[build_parameter(client) for client in clients],
 )
 results = await model.build(
     "OpenAI has been irresponsible in their handling of AI technology."
@@ -477,28 +492,30 @@ from surv_ai import (
 
 client = GPTClient(os.environ["OPEN_AI_API_KEY"])
 
-survey = Survey(
-    client,
-    tool_belt=ToolBelt(
-        client,
-        tools=[
-            GoogleCustomSearchTool(
-                client,
-                os.environ["GOOGLE_API_KEY"],
-                os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                start_date="2023-01-01",
-                end_date="2023-05-01",
-                n_pages=10,
-            )
-        ]
+tool_belt = ToolBelt(
+    tools=[
+        GoogleCustomSearchTool(
+            google_api_key=os.environ["GOOGLE_API_KEY"],
+            google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
+            start_date="2023-01-01",
+            end_date="2023-05-01",
+            n_pages=10,
+        )
+    ]
+)
+base_knowledge = [
+    Knowledge(
+        text="It is currently 2023/05/01, all the articles are from 2023.",
+        source="Additional context",
     ),
+]
+
+survey = Survey(
+    client=client,
+    tool_belt=tool_belt,
+    base_knowledge=base_knowledge,
+    max_knowledge_per_agent=3,
     n_agents=10,
-    base_knowledge=[
-        Knowledge(
-            text="It is currently 2023/05/01, all the articles are from 2023.",
-            source="Additional context",
-        ),
-    ],
 )
 
 await survey.conduct(

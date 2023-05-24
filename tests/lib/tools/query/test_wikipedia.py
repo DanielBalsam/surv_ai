@@ -8,9 +8,7 @@ async def test_can_use_tool():
     with patch("requests.post"):
         mock_client = AsyncMock()
         mock_client.get_completions = AsyncMock(return_value=["an article titled hello world"])
-        mock_tool = WikipediaTool(
-            llm_client=mock_client,
-        )
+        mock_tool = WikipediaTool()
         mock_tool._search = AsyncMock(
             return_value=[
                 "Hello World",
@@ -18,6 +16,7 @@ async def test_can_use_tool():
         )
 
         return_val = await mock_tool.use(
+            mock_client,
             "prompt",
             [],
         )

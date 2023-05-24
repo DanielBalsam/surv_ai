@@ -1,5 +1,6 @@
 import asyncio
 import re
+from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -25,9 +26,9 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     def __init__(
         self,
-        llm_client: LargeLanguageModelClientInterface,
-        google_api_key: str,
-        google_search_engine_id: str,
+        llm_client: Optional[LargeLanguageModelClientInterface] = None,
+        google_api_key: str = "",
+        google_search_engine_id: str = "",
         start_date=None,
         end_date=None,
         n_pages=1,
@@ -35,7 +36,15 @@ class GoogleCustomSearchTool(QueryToolInterface):
         max_concurrency=10,
         only_include_sources=None,
     ):
-        self.client = llm_client
+        if llm_client:
+            logger.log_warning(
+                "Deprecation warning: LargeLanguageModelClient no longer should be passed into tools on init."
+            )
+
+        if not google_api_key:
+            raise ValueError("google_api_key is required for GoogleCustomSearchTool")
+        elif not google_search_engine_id:
+            raise ValueError("google_search_engine_id is required for GoogleCustomSearchTool")
 
         self.google_api_key = google_api_key
         self.google_search_engine_id = google_search_engine_id
@@ -133,6 +142,7 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     async def _ingest_page_information(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         title: str,
         publication: str,
@@ -164,12 +174,13 @@ class GoogleCustomSearchTool(QueryToolInterface):
                 ),
             ],
         )
-        response = await self.client.get_completions([prompt])
+        response = await llm_client.get_completions([prompt])
 
         return response[0]
 
     async def _ingest_pages(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         result: dict,
     ):
@@ -181,6 +192,7 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
             logger.log_context(f"......Retrieving {publication} article with title {title}......")
             page_summary = await self._ingest_page_information(
+                llm_client,
                 original_prompt,
                 title,
                 publication,
@@ -198,6 +210,7 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     async def use(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         search_query: str,
     ) -> list[Knowledge]:
@@ -216,7 +229,7 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
             response += await asyncio.gather(
                 *[
-                    self._ingest_pages(original_prompt, result)
+                    self._ingest_pages(llm_client, original_prompt, result)
                     for result in search_results[len(response) : len(response) + results_to_fetch]
                 ]
             )

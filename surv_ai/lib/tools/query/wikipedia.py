@@ -1,5 +1,6 @@
 import asyncio
 import re
+from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -25,10 +26,14 @@ class WikipediaTool(QueryToolInterface):
 
     def __init__(
         self,
-        llm_client: LargeLanguageModelClientInterface,
+        llm_client: Optional[LargeLanguageModelClientInterface] = None,
         n_articles=1,
     ):
-        self.client = llm_client
+        if llm_client:
+            logger.log_warning(
+                "Deprecation warning: LargeLanguageModelClient no longer should be passed into tools on init."
+            )
+
         self.n_articles = n_articles
 
         self._already_searched = dict()
@@ -80,6 +85,7 @@ class WikipediaTool(QueryToolInterface):
 
     async def _ingest_page_information(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         page_title: str,
     ):
@@ -109,17 +115,19 @@ class WikipediaTool(QueryToolInterface):
                 ),
             ],
         )
-        response = await self.client.get_completions([prompt], **{"temperature": 0.2})
+        response = await llm_client.get_completions([prompt], **{"temperature": 0.2})
 
         return response[0]
 
     async def _ingest_pages(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         page_title: str,
     ):
         logger.log_context(f"......Learning Wikipedia page with title {page_title}......")
         page_summary = await self._ingest_page_information(
+            llm_client,
             original_prompt,
             page_title,
         )
@@ -134,6 +142,7 @@ class WikipediaTool(QueryToolInterface):
 
     async def _filter_relevant_pages(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         search_results: list[str],
     ):
@@ -158,22 +167,26 @@ class WikipediaTool(QueryToolInterface):
                 ),
             ],
         )
-        response = (await self.client.get_completions([prompt]))[0]
+        response = (await llm_client.get_completions([prompt]))[0]
 
         return response
 
     async def use(
         self,
+        llm_client: LargeLanguageModelClientInterface,
         original_prompt: str,
         search_query: str,
     ) -> list[Knowledge]:
         search_results = await self._search(search_query)
 
-        relevant_results = (await self._filter_relevant_pages(original_prompt, search_results)).split(", ")
+        relevant_results = (await self._filter_relevant_pages(llm_client, original_prompt, search_results)).split(", ")
 
         if len(relevant_results) == 0:
             return []
 
         return await asyncio.gather(
-            *[self._ingest_pages(original_prompt, page_title) for page_title in relevant_results[: self.n_articles]]
+            *[
+                self._ingest_pages(llm_client, original_prompt, page_title)
+                for page_title in relevant_results[: self.n_articles]
+            ]
         )
