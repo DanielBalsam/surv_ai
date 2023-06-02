@@ -9,13 +9,11 @@ from ..interfaces import AgentInterface
 class ReasoningAgent(BaseAgent, AgentInterface):
     def _get_completion_prompt_text(self, prompt: str):
         return f"""     
-        You are a citizen who must vote on whether this statement is more likely to be true or false:
+        You are a decisive agent who is concerned with whether this statement is more likely to be true or false:
 
         {prompt}
            
         You must decide whether you think the statement is more likely to be true or false.
-
-        You must cast your vote and participate in the civic process.
 
         The next two messages will be arguments in favor and against the above statement.
 
@@ -24,13 +22,11 @@ class ReasoningAgent(BaseAgent, AgentInterface):
 
     def _get_argument_prompt_text(self, prompt: str):
         return f"""     
-        You are a citizen who must vote on whether this statement is more likely to be true or false:
+        You are a decisive agent who is concerned with whether this statement is more likely to be true or false:
 
         {prompt}
            
         You must decide whether you think the statement is more likely to be true or false.
-
-        You must cast your vote and participate in the civic process.
 
         The next set of messages will be a series of articles that you can use to help you make your decision.
 
@@ -38,7 +34,7 @@ class ReasoningAgent(BaseAgent, AgentInterface):
 
         Include both the publication title and the article title in your citations.
 
-        You must make the best decision possible with the information you have. 
+        You must make the best decision possible with the information you have.
         """
 
     def _get_plan_prompt_text(self, prompt: str):

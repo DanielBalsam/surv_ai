@@ -7,13 +7,13 @@ from ..agent import BaseAgent
 class BinaryAgent(BaseAgent):
     def _get_initial_prompt_text(self, assertion: str):
         return f"""        
-        Your job is to determine if the user believes a statement is true or false.
+        Your job is to determine if the user believes a hypothesis is more likely to be true or false.
 
-        Here is the original assertion:
+        Here is the original hypothesis:
         
         "{assertion}"
 
-        The next message will be the statement for the user.
+        The next message will be what the user thinks.
 
         Your only options are "True," or "False".
 
@@ -31,13 +31,10 @@ class BinaryAgent(BaseAgent):
                 role="system",
                 content=self._get_initial_prompt_text(assertion),
             ),
-            PromptMessage(
-                role="user",
-                content=conversation.as_string(),
-            ),
+            PromptMessage(role="user", content=conversation.as_string(), name="User thinks"),
             PromptMessage(
                 role="assistant",
-                content="I believe the user thinks this statement is: ",
+                content="I believe the user thinks this hypothesis is: ",
             ),
         ]
 
