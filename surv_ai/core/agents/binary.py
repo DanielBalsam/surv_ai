@@ -31,11 +31,7 @@ class BinaryAgent(BaseAgent):
                 role="system",
                 content=self._get_initial_prompt_text(assertion),
             ),
-            PromptMessage(
-                role="user",
-                content=conversation.as_string(),
-                name="User thinks"
-            ),
+            PromptMessage(role="user", content=conversation.as_string(), name="User thinks"),
             PromptMessage(
                 role="assistant",
                 content="I believe the user thinks this hypothesis is: ",
