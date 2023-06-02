@@ -218,9 +218,10 @@ def build_parameter(date_range: tuple[str, str]):
             GoogleCustomSearchTool(
                 google_api_key=os.environ["GOOGLE_API_KEY"],
                 google_search_engine_id=os.environ["GOOGLE_SEARCH_ENGINE_ID"],
-                n_pages=20,
+                n_pages=30,
                 start_date=date_range[0],
-                end_date=date_range[1]
+                end_date=date_range[1],
+                max_concurrency=20,
             ),
         ],
     )
@@ -235,8 +236,8 @@ def build_parameter(date_range: tuple[str, str]):
         kwargs={
             "client": client,
             "n_agents": 100,
-            "max_knowledge_per_agent":20,
-            "max_concurrency": 10,
+            "max_knowledge_per_agent":5,
+            "max_concurrency": 20,
             "tool_belt": tool_belt,
             "base_knowledge": base_knowledge,
         },
@@ -256,8 +257,16 @@ model = Model(
     parameters=[build_parameter(date_range) for date_range in date_ranges],
 )
 
-results = await model.build(
+democrat_results = await model.build(
     "Democrats are favored to maintain control of the Senate in the 2022 November Midterm elections.",
+)
+```
+
+We can also plot the inverted statement and observe opposite trend lines:
+
+```
+republican_results = await model.build(
+    "Republicans are favored to maintain control of the Senate in the 2022 November Midterm elections.",
 )
 ```
 
@@ -267,7 +276,9 @@ When compared with a leading model in political opinion polling, our model is pr
 
 *In this example, the agents crawled websites such as nytimes.com, wsj.com, abcnews.com, cnn.com, bloomberg.com, foxnews.com, economist.com, washingtonpost.com, and nbcnews.com. [FiveThirtyEight data can be found here.](https://projects.fivethirtyeight.com/2022-election-forecast/senate/)*
 
-Pretty cool! Another example could involve plotting sentiments about the economy and using fluctuations in the yield curve as a benchmark for accuracy.
+Pretty cool! Note that the outputs don't represent complementary probabilities due to nuances in how the models reason, and biases of the models and data sources, but we can observe trend lines that do mirror each other quite well.
+
+Another example could involve plotting sentiments about the economy and using fluctuations in the S&P 500 as a benchmark for accuracy.
 
 ```
 from surv_ai import (
@@ -304,7 +315,7 @@ def build_parameter(date_range: tuple[str, str]):
         kwargs={
             "client": client,
             "n_agents": 100,
-            "max_knowledge_per_agent":20,
+            "max_knowledge_per_agent":5,
             "max_concurrency": 10,
             "tool_belt": tool_belt,
             "base_knowledge": base_knowledge,
@@ -333,9 +344,9 @@ results = await model.build(
 
 This gives us the following graph:
 
-![](https://raw.githubusercontent.com/DanielBalsam/surv_ai/main/examples/yield_spread.png)
+![](https://raw.githubusercontent.com/DanielBalsam/surv_ai/main/examples/S&P.png)
 
-*In this example, the agents crawled websites such as nytimes.com, wsj.com, abcnews.com, cnn.com, bloomberg.com, foxnews.com, economist.com, washingtonpost.com, and nbcnews.com. Please note that it is the complement of multi-agent model that is plotted. [Yield spread data can be found here.](https://www.longtermtrends.net/us-treasury-yield-curve/)*
+*In this example, the agents crawled websites such as nytimes.com, wsj.com, abcnews.com, cnn.com, bloomberg.com, foxnews.com, economist.com, washingtonpost.com, and nbcnews.com. Please note that it is the complement of multi-agent model that is plotted. [S&P data can be found here.](https://www.google.com/finance/quote/.INX:INDEXSP?sa=X&ved=2ahUKEwi2hJWyg6D_AhXiGFkFHdqHCIYQ3ecFegQIIRAf)*
 
 ### Measuring bias in a data corpus
 
@@ -450,7 +461,7 @@ def build_parameter(client: LargeLanguageModelClientInterface):
         kwargs={
             "client": client,
             "n_agents": 100,
-            "max_knowledge_per_agent":20,
+            "max_knowledge_per_agent":3,
             "max_concurrency": 3,
             "tool_belt": tool_belt,
             "base_knowledge": base_knowledge,
@@ -466,7 +477,7 @@ results = await model.build(
 )
 ```
 
-When we compare this statement between Anthropic and OpenAI's models, the resulting scatter plot appears as follows:
+When we compare the results between Anthropic and OpenAI's models, the scatter plot appears as follows:
 
 ![](https://raw.githubusercontent.com/DanielBalsam/surv_ai/main/examples/openai.png)
 
@@ -578,6 +589,7 @@ A few directions I plan to explore with this project include:
 3. I plan to incorporate clients with more instruction-tuned and reinforcement-learned LLMs.
 4. One feature that would be exciting would be the ability to easily fit a machine learning model against a multi-agent model. This could allow projection with the multi-agent models.
 5. More documentation and use guides!
+6. Experiment with "according to" prompting outlined in: https://arxiv.org/abs/2305.13252
 
 
 ## 🤝 Contribute 
