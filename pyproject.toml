@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "surv_ai"
-version = "0.1.9"
+version = "0.1.10"
 description = "A framework for multi-agent modeling using large language models"
 authors = ["Daniel Balsam <daniel.balsam@survai.org>"]
 license = "MIT"
