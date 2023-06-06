@@ -584,13 +584,13 @@ Additionally, thanks go to the multitude of researchers and engineers out there 
 
 A few directions I plan to explore with this project include:
 
-1. I'm considering transitioning the core Large Language Model (LLM) interaction code to take advantage of Microsoft's Guidance framework.
-2. I aim to further refine the agent code to improve decision-making across a wide variety of problems. I'm particularly interested in exploring Tree of Thought Prompting to see the outcomes it generates.
-3. I plan to incorporate clients with more instruction-tuned and reinforcement-learned LLMs.
-4. One feature that would be exciting would be the ability to easily fit a machine learning model against a multi-agent model. This could allow projection with the multi-agent models.
-5. More documentation and use guides!
-6. Experiment with "according to" prompting outlined in: https://arxiv.org/abs/2305.13252
-
+1. Use the AmbiFC fact-checking data set to benchmark the approach of this framework and compare all future changes against this benchmark: https://paperswithcode.com/paper/evidence-based-verification-for-real-world
+2. Developer experience improvements for creating custom tools.
+3. Social media scraping integrations for commercial sentiment analysis use cases.
+4. I'm considering transitioning the core Large Language Model (LLM) interaction code to take advantage of Microsoft's Guidance framework.
+5. I plan to incorporate clients with more instruction-tuned and reinforcement-learned LLMs.
+6. One feature that would be exciting would be the ability to easily fit a machine learning model against a multi-agent model. This could allow projection with the multi-agent models.
+7. More documentation and use guides!
 
 ## 🤝 Contribute 
 
