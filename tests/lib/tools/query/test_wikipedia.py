@@ -1,29 +1,26 @@
 from mock import patch
 
-from surv_ai import Knowledge, WikipediaTool
+from surv_ai import ToolResult, WikipediaTool
 from tests.utils import AsyncMock
 
 
 async def test_can_use_tool():
     with patch("requests.post"):
-        mock_client = AsyncMock()
-        mock_client.get_completions = AsyncMock(return_value=["an article titled hello world"])
         mock_tool = WikipediaTool()
         mock_tool._search = AsyncMock(
             return_value=[
                 "Hello World",
             ]
         )
+        mock_tool._get_page_text = AsyncMock(return_value=["test"])
 
-        return_val = await mock_tool.use(
-            mock_client,
-            "prompt",
-            [],
-        )
+        return_val = await mock_tool.use("query")
 
         assert return_val == [
-            Knowledge(
-                text="Wikipedia page entitled an article titled hello world: an article titled hello world",
-                source="https://en.wikipedia.org/wiki/an_article_titled_hello_world",
+            ToolResult(
+                site_name="Wikipedia",
+                body="test",
+                title="Hello World",
+                url="https://en.wikipedia.org/wiki/Hello_World",
             )
         ]

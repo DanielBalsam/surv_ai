@@ -27,11 +27,7 @@ async def test_inspect_tool_belt():
     assert tool_belt.tools_as_list(tool_belt.tools) == "1. TOOL(keywords) - instruction"
     assert mock_client.get_completions.call_count == 1
     assert mock_tool.use.call_count == 1
-    assert mock_tool.use.call_args[0] == (
-        mock_client,
-        "prompt",
-        "hello",
-    )
+    assert mock_tool.use.call_args[0] == ("hello",)
     assert return_val == [
         Knowledge(
             text="Hello World",

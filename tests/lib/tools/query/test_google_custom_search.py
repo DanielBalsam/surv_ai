@@ -1,14 +1,12 @@
 from mock import Mock, patch
 
-from surv_ai import GoogleCustomSearchTool, Knowledge
+from surv_ai import GoogleCustomSearchTool, ToolResult
 from tests.utils import AsyncMock
 
 
 async def test_can_use_tool():
     with patch("requests.get", new_callable=Mock) as mock_get:
-        mock_get.return_value.text = "test"
-        mock_client = AsyncMock()
-        mock_client.get_completions = AsyncMock(return_value=["an article titled hello world"])
+        mock_get.return_value.text = "<p>test</p>"
         mock_tool = GoogleCustomSearchTool(
             google_api_key="123",
             google_search_engine_id="456",
@@ -30,17 +28,14 @@ async def test_can_use_tool():
             ]
         )
 
-        return_val = await mock_tool.use(
-            mock_client,
-            "prompt",
-            [],
-        )
+        return_val = await mock_tool.use("query val")
 
-        assert mock_client.get_completions.call_count == 1
         assert mock_tool._search.call_count == 1
         assert return_val == [
-            Knowledge(
-                text='https://www.google.com article entitled "Hello World": an article titled hello world',
-                source="https://www.google.com",
+            ToolResult(
+                body="test",
+                site_name="https://www.google.com",
+                title="Hello World",
+                url="https://www.google.com",
             )
         ]
