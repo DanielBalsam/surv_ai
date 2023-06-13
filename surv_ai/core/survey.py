@@ -121,8 +121,8 @@ class Survey(SurveyInterface):
                         break
                     page = relevant_webpages.pop(0)
 
-                    SIZE_TO_SUMMARIZE_ABOCE = 1000
-                    if len(page.body) > SIZE_TO_SUMMARIZE_ABOCE:
+                    SIZE_TO_SUMMARIZE_ABOVE = 1000
+                    if len(page.body) > SIZE_TO_SUMMARIZE_ABOVE:
                         coroutines.append(self._summarize_webpage(hypothesis, page))
                     else:
                         summary_text = f"{page.title}: {page.body}"

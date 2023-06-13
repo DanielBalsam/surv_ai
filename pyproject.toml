@@ -50,7 +50,7 @@ beautifulsoup4 = "^4.12.2"
 colorama = "^0.4.6"
 exceptiongroup = "^1.1.1"
 requests = "^2.31.0"
-snscrape = {git = "https://github.com/JustAnotherArchivist/snscrape.git"}
+snscrape = "^0.6.2.20230320"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.22.0"
@@ -62,6 +62,7 @@ pytest = "^7.3.1"
 mock = "^5.0.2"
 pytest-asyncio = "^0.21.0"
 pandas = "^2.0.2"
+snscrape = {git = "https://github.com/JustAnotherArchivist/snscrape.git"}
 
 [build-system]
 requires = ["poetry-core"]
