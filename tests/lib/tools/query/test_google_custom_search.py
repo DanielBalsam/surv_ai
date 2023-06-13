@@ -35,7 +35,7 @@ async def test_can_use_tool():
             ToolResult(
                 body="test",
                 site_name="https://www.google.com",
-                title="Hello World",
+                title="https://www.google.com page titled \"Hello World\"",
                 url="https://www.google.com",
             )
         ]

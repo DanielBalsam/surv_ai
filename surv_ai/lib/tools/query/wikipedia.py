@@ -88,7 +88,7 @@ class WikipediaTool(ToolInterface):
         source = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
 
         return ToolResult(
-            title=page_title,
+            title=f"Wikipedia page titled \"{page_title}\"",
             url=source,
             site_name="Wikipedia",
             body=page_body,

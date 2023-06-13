@@ -95,7 +95,7 @@ class Survey(SurveyInterface):
         summary_agent = WebPageSummaryAgent(self.client, _hyperparameters={"temperature": 0.2})
         page_summary = await summary_agent.prompt(hypothesis, page.site_name, page.title, page.body)
 
-        summary_text = f'{page.site_name} page entitled "{page.title}": {page_summary}'
+        summary_text = f'{page.title}: {page_summary}'
         logger.log_context(summary_text)
 
         return Knowledge(
@@ -116,9 +116,23 @@ class Survey(SurveyInterface):
             webpage_summaries = []
             while len(relevant_webpages):
                 coroutines = []
-                for _ in range(min(self.max_concurrency, len(relevant_webpages) - len(webpage_summaries))):
+                for _ in range(self.max_concurrency):
+                    if not relevant_webpages:
+                        break
                     page = relevant_webpages.pop(0)
-                    coroutines.append(self._summarize_webpage(hypothesis, page))
+
+                    SIZE_TO_SUMMARIZE_ABOCE = 1000
+                    if len(page.body) > SIZE_TO_SUMMARIZE_ABOCE:
+                        coroutines.append(self._summarize_webpage(hypothesis, page))
+                    else:
+                        summary_text = f"{page.title}: {page.body}"
+                        logger.log_context(summary_text)
+                        webpage_summaries.append(
+                            Knowledge(
+                                text=summary_text,
+                                source=page.url,
+                            )
+                        )
 
                 webpage_summaries += await asyncio.gather(*coroutines)
 

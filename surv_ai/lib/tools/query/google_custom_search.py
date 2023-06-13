@@ -4,7 +4,6 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from surv_ai.lib.knowledge_store.interfaces import Knowledge
 from surv_ai.lib.log import logger
 from surv_ai.lib.tools.interfaces import ToolResult
 
@@ -106,7 +105,7 @@ class GoogleCustomSearchTool(ToolInterface):
 
             return ToolResult(
                 url=result["link"],
-                title=title,
+                title=f"{site_name} page titled \"{title}\"",
                 body=page_text,
                 site_name=site_name,
             )
@@ -117,7 +116,7 @@ class GoogleCustomSearchTool(ToolInterface):
     async def use(
         self,
         search_query: str,
-    ) -> list[Knowledge]:
+    ) -> list[ToolResult]:
         search_results = await self._search(search_query)
 
         if len(search_results) == 0:
