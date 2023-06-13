@@ -20,7 +20,7 @@ async def test_can_use_tool():
             ToolResult(
                 site_name="Wikipedia",
                 body="test",
-                title="Wikipedia page titled \"Hello World\"",
+                title='Wikipedia page titled "Hello World"',
                 url="https://en.wikipedia.org/wiki/Hello_World",
             )
         ]

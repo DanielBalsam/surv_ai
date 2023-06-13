@@ -95,7 +95,7 @@ class Survey(SurveyInterface):
         summary_agent = WebPageSummaryAgent(self.client, _hyperparameters={"temperature": 0.2})
         page_summary = await summary_agent.prompt(hypothesis, page.site_name, page.title, page.body)
 
-        summary_text = f'{page.title}: {page_summary}'
+        summary_text = f"{page.title}: {page_summary}"
         logger.log_context(summary_text)
 
         return Knowledge(

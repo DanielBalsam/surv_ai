@@ -105,7 +105,7 @@ class GoogleCustomSearchTool(ToolInterface):
 
             return ToolResult(
                 url=result["link"],
-                title=f"{site_name} page titled \"{title}\"",
+                title=f'{site_name} page titled "{title}"',
                 body=page_text,
                 site_name=site_name,
             )
