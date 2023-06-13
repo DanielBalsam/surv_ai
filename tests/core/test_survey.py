@@ -1,18 +1,19 @@
 from mock import patch
 
-from surv_ai import Knowledge, Survey
+from surv_ai import Survey, ToolResult
 from tests.utils import AsyncMock
 
 
 async def test_conduct():
     with patch("surv_ai.core.survey.ReasoningAgent") as mock_reasoning_agent, patch(
         "surv_ai.core.survey.BinaryAgent"
-    ) as mock_binary_agent:
+    ) as mock_binary_agent, patch("surv_ai.core.survey.WebPageSummaryAgent") as mock_summary_agent:
         mock_reasoning_agent.return_value.color = "red"
         mock_binary_agent.return_value.color = "blue"
 
         mock_reasoning_agent.return_value.prompt = AsyncMock(return_value="I think it's true")
         mock_binary_agent.return_value.prompt = AsyncMock(return_value="True")
+        mock_summary_agent.return_value.prompt = AsyncMock(return_value="Test page summary: its a test")
 
         mock_tool_belt = AsyncMock()
         mock_client = AsyncMock()
@@ -23,9 +24,11 @@ async def test_conduct():
         )
         mock_tool_belt.inspect = AsyncMock(
             return_value=[
-                Knowledge(
-                    text="test",
-                    source="test",
+                ToolResult(
+                    url="test",
+                    body="test",
+                    title="test",
+                    site_name="test",
                 )
             ]
         )

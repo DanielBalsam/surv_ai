@@ -9,20 +9,19 @@ from surv_ai.lib.llm.interfaces import (
 )
 from surv_ai.lib.log import logger
 
-from .interfaces import NoMemoriesFoundException, ToolBeltInterface, ToolInterface
+from .interfaces import (
+    NoMemoriesFoundException,
+    ToolBeltInterface,
+    ToolInterface,
+    ToolResult,
+)
 
 
 class ToolBelt(ToolBeltInterface):
     def __init__(
         self,
-        llm_client: Optional[LargeLanguageModelClientInterface] = None,
         tools: Optional[list[ToolInterface]] = None,
     ):
-        if llm_client:
-            logger.log_warning(
-                "Deprecation warning: LargeLanguageModelClient no longer should be passed into ToolBelt on init."
-            )
-
         self.tools = tools or []
 
     @staticmethod
@@ -71,26 +70,24 @@ class ToolBelt(ToolBeltInterface):
         original_prompt: str,
         base_knowledge: list[Knowledge],
         attempt=1,
-    ):
+    ) -> list[ToolResult]:
         prompt = self._get_tool_belt_prompt(original_prompt, base_knowledge)
 
         response = (await client.get_completions([prompt], **{"temperature": 0.7}))[0].strip()
 
+        results: list[ToolResult] = []
         for tool in self.tools:
             match = re.match(tool.command, response)
 
             if match:
-                knowledge = []
                 for args in match.groups():
                     logger.log_context(f"...Using tool: {response}...")
 
-                    knowledge += await tool.use(client, original_prompt, args)
+                    results += await tool.use(args)
 
-                    if not knowledge and attempt < 3:
-                        knowledge = await self.inspect(client, original_prompt, base_knowledge, attempt=attempt + 1)
-                    elif not knowledge:
+                    if not results and attempt < 3:
+                        results = await self.inspect(client, original_prompt, base_knowledge, attempt=attempt + 1)
+                    elif not results:
                         raise NoMemoriesFoundException()
 
-                return knowledge
-
-        return []
+        return results

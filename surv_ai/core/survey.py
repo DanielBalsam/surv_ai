@@ -6,10 +6,15 @@ from surv_ai.lib.conversation.conversation import Conversation
 from surv_ai.lib.knowledge_store.interfaces import Knowledge
 from surv_ai.lib.llm.interfaces import LargeLanguageModelClientInterface
 from surv_ai.lib.log import logger
-from surv_ai.lib.tools.interfaces import NoMemoriesFoundException, ToolBeltInterface
+from surv_ai.lib.tools.interfaces import (
+    NoMemoriesFoundException,
+    ToolBeltInterface,
+    ToolResult,
+)
 
 from .agents.binary import BinaryAgent
 from .agents.reasoning import ReasoningAgent
+from .agents.web_page_summary import WebPageSummaryAgent
 from .interfaces import SurveyInterface, SurveyResponse
 
 
@@ -86,6 +91,18 @@ class Survey(SurveyInterface):
             logger.log_exception(e)
             return "error"
 
+    async def _summarize_webpage(self, hypothesis: str, page: ToolResult):
+        summary_agent = WebPageSummaryAgent(self.client, _hyperparameters={"temperature": 0.2})
+        page_summary = await summary_agent.prompt(hypothesis, page.site_name, page.title, page.body)
+
+        summary_text = f"{page.title}: {page_summary}"
+        logger.log_context(summary_text)
+
+        return Knowledge(
+            text=summary_text,
+            source=page.url,
+        )
+
     async def conduct(self, hypothesis: str):
         results = {"true": 0, "false": 0, "undecided": 0, "error": 0}
 
@@ -93,7 +110,32 @@ class Survey(SurveyInterface):
         agents = 0
 
         try:
-            relevant_articles = await self.tool_belt.inspect(self.client, hypothesis, self.base_knowledge or [])
+            relevant_webpages: list[ToolResult] = await self.tool_belt.inspect(
+                self.client, hypothesis, self.base_knowledge or []
+            )
+            webpage_summaries = []
+            while len(relevant_webpages):
+                coroutines = []
+                for _ in range(self.max_concurrency):
+                    if not relevant_webpages:
+                        break
+                    page = relevant_webpages.pop(0)
+
+                    SIZE_TO_SUMMARIZE_ABOCE = 1000
+                    if len(page.body) > SIZE_TO_SUMMARIZE_ABOCE:
+                        coroutines.append(self._summarize_webpage(hypothesis, page))
+                    else:
+                        summary_text = f"{page.title}: {page.body}"
+                        logger.log_context(summary_text)
+                        webpage_summaries.append(
+                            Knowledge(
+                                text=summary_text,
+                                source=page.url,
+                            )
+                        )
+
+                webpage_summaries += await asyncio.gather(*coroutines)
+
         except NoMemoriesFoundException:
             return SurveyResponse(
                 in_favor=0,
@@ -112,7 +154,7 @@ class Survey(SurveyInterface):
                 raise Exception("Agent error rate is unusually high, likely an issue with API access.")
 
             for index in range(min(self.max_concurrency, self.n_agents - agents)):
-                coroutines.append(self._poll_agent(hypothesis, summaries, relevant_articles, index))
+                coroutines.append(self._poll_agent(hypothesis, summaries, webpage_summaries, index))
                 agents += 1
 
             decisions = await asyncio.gather(*coroutines)

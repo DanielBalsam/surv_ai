@@ -1,11 +1,20 @@
 from re import Pattern
 from typing import Protocol
 
+from pydantic import BaseModel
+
 from ..llm.interfaces import LargeLanguageModelClientInterface
 
 
 class NoMemoriesFoundException(Exception):
     ...
+
+
+class ToolResult(BaseModel):
+    url: str
+    site_name: str
+    title: str
+    body: str
 
 
 class ToolInterface(Protocol):
@@ -15,7 +24,7 @@ class ToolInterface(Protocol):
     def __init__(self, _: LargeLanguageModelClientInterface, *args, **kwargs):
         ...
 
-    async def use(self, client: LargeLanguageModelClientInterface, *args, **kwargs):
+    async def use(self, *args, **kwargs) -> list[ToolResult]:
         ...
 
 
@@ -29,5 +38,5 @@ class ToolBeltInterface(Protocol):
     ):
         ...
 
-    async def inspect(self, client: LargeLanguageModelClientInterface, query: str):
+    async def inspect(self, client: LargeLanguageModelClientInterface, query: str) -> list[ToolResult]:
         ...

@@ -1,22 +1,16 @@
 import asyncio
 import re
-from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
 
-from surv_ai.lib.knowledge_store.interfaces import Knowledge
-from surv_ai.lib.llm.interfaces import (
-    LargeLanguageModelClientInterface,
-    Prompt,
-    PromptMessage,
-)
 from surv_ai.lib.log import logger
+from surv_ai.lib.tools.interfaces import ToolResult
 
-from .interfaces import QueryToolInterface
+from ..interfaces import ToolInterface
 
 
-class GoogleCustomSearchTool(QueryToolInterface):
+class GoogleCustomSearchTool(ToolInterface):
     instruction = """
         `SEARCH(keywords)` - use keywords to search the web for additional information.
     """
@@ -26,21 +20,13 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     def __init__(
         self,
-        llm_client: Optional[LargeLanguageModelClientInterface] = None,
         google_api_key: str = "",
         google_search_engine_id: str = "",
         start_date=None,
         end_date=None,
-        n_pages=1,
-        max_percent_per_source=1.0,
-        max_concurrency=10,
-        only_include_sources=None,
+        n_pages=10,
+        only_include_websites=None,
     ):
-        if llm_client:
-            logger.log_warning(
-                "Deprecation warning: LargeLanguageModelClient no longer should be passed into tools on init."
-            )
-
         if not google_api_key:
             raise ValueError("google_api_key is required for GoogleCustomSearchTool")
         elif not google_search_engine_id:
@@ -48,22 +34,14 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
         self.google_api_key = google_api_key
         self.google_search_engine_id = google_search_engine_id
-
         self.n_pages = n_pages
-
         self.start_date = start_date
         self.end_date = end_date
-
-        self.max_percent_per_source = max_percent_per_source
-        self.max_concurrency = max_concurrency
-
-        self.only_include_sources = only_include_sources
+        self.only_include_websites = only_include_websites
 
     async def _search(self, query: str) -> list[str]:
         start = 1
         results = []
-
-        seen_sources = {}
 
         while len(results) < self.n_pages:
             params = {
@@ -87,48 +65,20 @@ class GoogleCustomSearchTool(QueryToolInterface):
             try:
                 new_records = data["items"]
             except Exception:
-                logger.log_exception("Could not retrieve all articles.")
+                logger.log_exception("Could not retrieve all pages.")
 
                 return results
 
             if not new_records:
                 break
 
-            if self.max_percent_per_source:
-                records_to_return = []
-
-                for record in new_records:
-                    if not seen_sources.get(record["displayLink"]):
-                        seen_sources[record["displayLink"]] = 0
-
-                    if self.only_include_sources:
-                        compatible_source = False
-                        for source in self.only_include_sources:
-                            if source in record["displayLink"]:
-                                compatible_source = True
-
-                        if not compatible_source:
-                            continue
-
-                    if seen_sources[record["displayLink"]] >= (self.n_pages * self.max_percent_per_source):
-                        continue
-
-                    seen_sources[record["displayLink"]] += 1
-                    records_to_return.append(record)
-
-                new_records = records_to_return
-
             results += new_records
             start += 10
 
         return results
 
-    async def _get_page_text(self, web_url: str) -> str:
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: requests.get(web_url, headers={"User-Agent": "Mozilla/5.0"}),
-        )
+    def _get_page_text(self, web_url: str) -> str:
+        response = requests.get(web_url, headers={"User-Agent": "Mozilla/5.0"})
 
         data = response.text
 
@@ -138,71 +88,26 @@ class GoogleCustomSearchTool(QueryToolInterface):
         for paragraph in soup.find_all("p"):
             results.append(paragraph.text)
 
-        return results
+        return "\n\n".join(results)
 
-    async def _ingest_page_information(
+    def _ingest_page(
         self,
-        llm_client: LargeLanguageModelClientInterface,
-        original_prompt: str,
-        title: str,
-        publication: str,
-        web_url: str,
-    ):
-        paragraphs = await self._get_page_text(web_url)
-
-        prompt = Prompt(
-            messages=[
-                PromptMessage(
-                    content=f"""A user has presented you with a hypothesis:
-                    
-                    {original_prompt}
-
-                    All subsequent messages will be paragraphs from a {publication} article titled "{title}."
-
-                    Your job is to extract any useful information that might help someone evaluate this hypothesis.
-
-                    Remember to include as much data and concrete examples as possible from the article.
-
-                    For each useful piece of information you extract, please state why it relates to the original hypothesis.
-                    """,
-                    role="system",
-                ),
-                *[PromptMessage(content=paragraph, role="user", name="Article") for paragraph in paragraphs],
-                PromptMessage(
-                    role="assistant",
-                    content=f"I have read the {publication} article entitled {title} and some useful information is:",
-                ),
-            ],
-        )
-        response = await llm_client.get_completions([prompt])
-
-        return response[0]
-
-    async def _ingest_pages(
-        self,
-        llm_client: LargeLanguageModelClientInterface,
-        original_prompt: str,
         result: dict,
     ):
         try:
             metatags = result["pagemap"]["metatags"][0]
 
-            publication = metatags.get("og:site_name", result["displayLink"])
+            site_name = metatags.get("og:site_name", result["displayLink"])
             title = metatags.get("og:title", result["title"])
 
-            logger.log_context(f"......Retrieving {publication} article with title {title}......")
-            page_summary = await self._ingest_page_information(
-                llm_client,
-                original_prompt,
-                title,
-                publication,
-                result["link"],
-            )
-            logger.log_internal(f"Summary of {publication} article with title {title}: {page_summary}")
+            logger.log_context(f"......Retrieving {site_name} page with title {title}......")
+            page_text = self._get_page_text(result["link"])
 
-            return Knowledge(
-                text=f'{publication} article entitled "{title}": {page_summary}',
-                source=result["link"],
+            return ToolResult(
+                url=result["link"],
+                title=f'{site_name} page titled "{title}"',
+                body=page_text,
+                site_name=site_name,
             )
         except Exception as e:
             logger.log_exception(e)
@@ -210,28 +115,13 @@ class GoogleCustomSearchTool(QueryToolInterface):
 
     async def use(
         self,
-        llm_client: LargeLanguageModelClientInterface,
-        original_prompt: str,
         search_query: str,
-    ) -> list[Knowledge]:
+    ) -> list[ToolResult]:
         search_results = await self._search(search_query)
 
         if len(search_results) == 0:
             return []
 
-        response = []
-
-        while len(response) < len(search_results[: self.n_pages]):
-            results_to_fetch = min(
-                self.max_concurrency,
-                len(search_results[: self.n_pages]) - len(response),
-            )
-
-            response += await asyncio.gather(
-                *[
-                    self._ingest_pages(llm_client, original_prompt, result)
-                    for result in search_results[len(response) : len(response) + results_to_fetch]
-                ]
-            )
+        response = [self._ingest_page(result) for result in search_results[0 : self.n_pages]]
 
         return [r for r in response if r]

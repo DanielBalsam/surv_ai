@@ -484,6 +484,61 @@ When we compare the results between Anthropic and OpenAI's models, the scatter p
 *In this example, the agents crawled websites such as nytimes.com, wsj.com, abcnews.com, cnn.com, bloomberg.com, foxnews.com, economist.com, washingtonpost.com, and nbcnews.com for articles published in the first half of 2023.*
 
 
+### Measuring sentiment on Twitter
+
+In addition to querying news sources we can also query social media websites for sentiment. There are many uses for this, but one simple and fun one would be to try and see if we can predict who will win the Academy Award for best picture.
+
+```
+from surv_ai import (
+    GPTClient,
+    ToolBelt,
+    TwitterTool,
+    Knowledge,
+    Survey,
+)
+client = GPTClient(os.environ["OPEN_AI_API_KEY"])
+
+films = [
+    "Everything Everywhere All At Once",
+    "All Quiet On the Western Front",
+    "The Banshees of Inisherin",
+    "The Fablemans",
+    "Tár",
+    "Top Gun: Maverick",
+    "Triangle of Sadness",
+    "Women Talking",
+]
+
+survey = Survey(
+    client,
+    n_agents=200,
+    tool_belt=ToolBelt(
+        tools=[
+            TwitterTool(
+                start_date="2023-01-01",
+                end_date="2023-03-11",
+                n_tweets=1000,
+            )
+        ]
+    ),
+    max_knowledge_per_agent=10,
+    base_knowledge=[
+        Knowledge(text="It is currently March 11th, 2023 and the Oscar's are tomorrow.", source="Additional context")
+    ]
+)
+
+results = {}
+for film in films:
+    results[film] = await survey.conduct(f"{film} is likely to win the Academy Award for Best Picture.")
+```
+
+Placing our results on a scatter plot, we get the correct result!
+
+![](https://raw.githubusercontent.com/DanielBalsam/surv_ai/main/examples/best_picture.png)
+*In this example, the agents were allowed to read Tweets up between January 1st 2023, and March 11th 2023 (the day before the Oscar's).*
+
+Sentiment on Twitter will not always be perfectly predictive of who will win an Academy Award, but it is an interesting way to try and predict outcomes.
+
 ## 🧠 Tips 
 
 Ultimately, a `Survey` is powered by a Large Language Model (LLM), which means that the survey hypothesis might require tuning, much like the general need to tune prompts. Here are some insights on crafting hypotheses.
@@ -585,12 +640,11 @@ Additionally, thanks go to the multitude of researchers and engineers out there 
 A few directions I plan to explore with this project include:
 
 1. Use the AmbiFC fact-checking data set to benchmark the approach of this framework and compare all future changes against this benchmark: https://paperswithcode.com/paper/evidence-based-verification-for-real-world
-2. Developer experience improvements for creating custom tools.
-3. Social media scraping integrations for commercial sentiment analysis use cases.
-4. I'm considering transitioning the core Large Language Model (LLM) interaction code to take advantage of Microsoft's Guidance framework.
-5. I plan to incorporate clients with more instruction-tuned and reinforcement-learned LLMs.
-6. One feature that would be exciting would be the ability to easily fit a machine learning model against a multi-agent model. This could allow projection with the multi-agent models.
-7. More documentation and use guides!
+2. More documentation and use guides!
+3. Kicking off a development blog.
+4. More integrations with various helpful tools.
+5. More examples and use cases.
+6. Experimentation to further optimize performance.
 
 ## 🤝 Contribute 
 
